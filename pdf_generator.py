@@ -18,6 +18,7 @@ from io import BytesIO
 from typing import Dict, List, Any
 import json
 import math
+from pdf_chart_generator import PDFChartGenerator
 
 class PDFGenerator:
     """Generate comprehensive PDF reports for startup valuations"""
@@ -25,6 +26,7 @@ class PDFGenerator:
     def __init__(self):
         self.styles = getSampleStyleSheet()
         self._create_custom_styles()
+        self.chart_generator = PDFChartGenerator()
     
     def _create_custom_styles(self):
         """Create custom paragraph styles"""
@@ -238,14 +240,21 @@ class PDFGenerator:
             self._add_vc_analysis(story, result, current_results)
     
     def _add_dcf_analysis(self, story: List, result: Dict):
-        """Add DCF-specific analysis"""
+        """Add DCF-specific analysis with visual chart"""
         story.append(Paragraph("DCF Valuation Components", self.styles['Heading3']))
         
         # Components table
+        operating_value = result.get('operating_value', 0)
+        terminal_pv = result.get('terminal_pv', 0)
+        total_value = operating_value + terminal_pv
+        
+        op_percentage = (operating_value / total_value * 100) if total_value > 0 else 0
+        term_percentage = (terminal_pv / total_value * 100) if total_value > 0 else 0
+        
         components = [
             ['Component', 'Value', 'Percentage'],
-            ['Operating Value', self._format_currency(result.get('operating_value', 0)), ''],
-            ['Terminal Value (PV)', self._format_currency(result.get('terminal_pv', 0)), ''],
+            ['Operating Value', self._format_currency(operating_value), f'{op_percentage:.1f}%'],
+            ['Terminal Value (PV)', self._format_currency(terminal_pv), f'{term_percentage:.1f}%'],
             ['Total Valuation', self._format_currency(result.get('valuation', 0)), '100%']
         ]
         
@@ -270,7 +279,25 @@ class PDFGenerator:
         ]))
         
         story.append(comp_table)
-        story.append(Spacer(1, 0.3*inch))
+        story.append(Spacer(1, 0.2*inch))
+        
+        # Add DCF chart
+        try:
+            chart_data = {
+                'result': result,
+                'inputs': {},
+                'method': 'DCF'
+            }
+            chart_path = self.chart_generator.create_dcf_chart(chart_data)
+            if chart_path:
+                chart_image = self.chart_generator.create_reportlab_image(
+                    chart_path, width=6*inch, height=3.5*inch
+                )
+                story.append(chart_image)
+                story.append(Spacer(1, 0.2*inch))
+        except Exception as e:
+            # Continue without chart if generation fails
+            pass
         
         # Assumptions
         story.append(Paragraph("Key Assumptions", self.styles['Heading3']))
