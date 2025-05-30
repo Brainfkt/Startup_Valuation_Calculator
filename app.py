@@ -852,8 +852,8 @@ def display_calculation_history():
 def generate_pdf_report():
     """Generate and download PDF report"""
     try:
-        if not st.session_state.current_results:
-            st.warning("No current calculation to generate report for")
+        if not st.session_state.calculation_history:
+            st.warning("No calculations available to generate report for. Please perform at least one valuation calculation.")
             return
         
         pdf_gen = PDFGenerator()
@@ -868,6 +868,8 @@ def generate_pdf_report():
             file_name=f"valuation_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
             mime="application/pdf"
         )
+        
+        st.success(f"✅ PDF report generated with {len(st.session_state.calculation_history)} calculation(s)")
         
     except Exception as e:
         st.error(f"PDF generation failed: {str(e)}")

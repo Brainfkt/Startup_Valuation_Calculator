@@ -66,7 +66,7 @@ class PDFGenerator:
     
     def create_report(self, current_results: Dict, calculation_history: List[Dict]) -> BytesIO:
         """
-        Create comprehensive PDF report
+        Create comprehensive PDF report with charts from calculation history
         
         Args:
             current_results: Current calculation results
@@ -92,17 +92,17 @@ class PDFGenerator:
             # Title page
             self._add_title_page(story)
             
-            # Executive summary
-            if current_results:
-                self._add_executive_summary(story, current_results)
-            
-            # Detailed analysis
-            if current_results:
-                self._add_detailed_analysis(story, current_results)
-            
-            # Calculation history
+            # Executive summary with all calculations
             if calculation_history:
-                self._add_calculation_history(story, calculation_history)
+                self._add_comprehensive_summary(story, calculation_history)
+            
+            # Detailed analysis for each calculation with charts
+            if calculation_history:
+                self._add_detailed_analysis_with_charts(story, calculation_history)
+            
+            # Comparative analysis
+            if len(calculation_history) > 1:
+                self._add_comparative_analysis(story, calculation_history)
             
             # Appendices
             self._add_appendices(story)
@@ -549,3 +549,143 @@ class PDFGenerator:
         buffer.seek(0)
         
         return buffer
+    
+    def _add_comprehensive_summary(self, story: List, calculation_history: List[Dict]):
+        """Add comprehensive summary of all calculations"""
+        story.append(Paragraph("Executive Summary", self.styles['SectionHeader']))
+        
+        story.append(Paragraph(
+            f"This report presents a comprehensive startup valuation analysis using {len(calculation_history)} "
+            f"different calculation{'s' if len(calculation_history) > 1 else ''} performed between "
+            f"{calculation_history[0]['timestamp']} and {calculation_history[-1]['timestamp']}.",
+            self.styles['Normal']
+        ))
+        
+        story.append(Spacer(1, 0.2*inch))
+        
+        # Summary table of all calculations
+        summary_data = [['Method', 'Date', 'Valuation']]
+        valuations = []
+        
+        for calc in calculation_history:
+            summary_data.append([
+                calc['method'],
+                calc['timestamp'],
+                self._format_currency(calc['valuation'])
+            ])
+            valuations.append(calc['valuation'])
+        
+        # Add statistics row
+        if valuations:
+            avg_valuation = sum(valuations) / len(valuations)
+            min_valuation = min(valuations)
+            max_valuation = max(valuations)
+            
+            summary_data.append(['', '', ''])  # Empty row
+            summary_data.append(['Average', '', self._format_currency(avg_valuation)])
+            summary_data.append(['Range', '', f"{self._format_currency(min_valuation)} - {self._format_currency(max_valuation)}"])
+        
+        summary_table = Table(summary_data, colWidths=[2*inch, 2*inch, 2*inch])
+        summary_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -4), colors.beige),
+            ('BACKGROUND', (0, -3), (-1, -1), colors.lightgrey),
+            ('FONTNAME', (0, -3), (-1, -1), 'Helvetica-Bold'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        story.append(summary_table)
+        story.append(Spacer(1, 0.3*inch))
+
+    def _add_detailed_analysis_with_charts(self, story: List, calculation_history: List[Dict]):
+        """Add detailed analysis for each calculation"""
+        story.append(PageBreak())
+        story.append(Paragraph("Detailed Analysis", self.styles['SectionHeader']))
+        
+        for i, calc in enumerate(calculation_history):
+            story.append(Paragraph(f"{calc['method']} Analysis", self.styles['Heading3']))
+            story.append(Paragraph(f"Performed on: {calc['timestamp']}", self.styles['Normal']))
+            story.append(Paragraph(f"Valuation: {self._format_currency(calc['valuation'])}", self.styles['MetricValue']))
+            story.append(Spacer(1, 0.2*inch))
+            
+            # Method-specific details
+            if calc['method'] == "DCF":
+                self._add_dcf_analysis(story, calc['result'])
+            elif calc['method'] == "Market Multiples":
+                self._add_multiples_analysis(story, calc['result'], calc)
+            elif calc['method'] == "Scorecard":
+                self._add_scorecard_analysis(story, calc['result'])
+            elif calc['method'] == "Berkus":
+                self._add_berkus_analysis(story, calc['result'])
+            elif calc['method'] == "Risk Factor Summation":
+                self._add_risk_analysis(story, calc['result'])
+            elif calc['method'] == "Venture Capital":
+                self._add_vc_analysis(story, calc['result'], calc)
+            
+            if i < len(calculation_history) - 1:
+                story.append(Spacer(1, 0.3*inch))
+
+    def _add_comparative_analysis(self, story: List, calculation_history: List[Dict]):
+        """Add comparative analysis section"""
+        story.append(PageBreak())
+        story.append(Paragraph("Comparative Analysis", self.styles['SectionHeader']))
+        
+        valuations = [calc['valuation'] for calc in calculation_history]
+        methods = [calc['method'] for calc in calculation_history]
+        
+        # Valuation range analysis
+        min_val = min(valuations)
+        max_val = max(valuations)
+        avg_val = sum(valuations) / len(valuations)
+        
+        story.append(Paragraph("Valuation Range Analysis", self.styles['Heading3']))
+        
+        range_data = [
+            ['Metric', 'Value'],
+            ['Minimum Valuation', self._format_currency(min_val)],
+            ['Maximum Valuation', self._format_currency(max_val)],
+            ['Average Valuation', self._format_currency(avg_val)],
+            ['Valuation Spread', self._format_currency(max_val - min_val)],
+            ['Coefficient of Variation', f"{(max_val - min_val) / avg_val * 100:.1f}%" if avg_val > 0 else "N/A"]
+        ]
+        
+        range_table = Table(range_data, colWidths=[2.5*inch, 2.5*inch])
+        range_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        story.append(range_table)
+        story.append(Spacer(1, 0.3*inch))
+        
+        # Method recommendations
+        story.append(Paragraph("Method Recommendations", self.styles['Heading3']))
+        
+        if 'DCF' in methods:
+            story.append(Paragraph(
+                "• DCF Method: Most suitable for companies with predictable cash flows and established business models.",
+                self.styles['Normal']
+            ))
+        
+        if 'Berkus' in methods:
+            story.append(Paragraph(
+                "• Berkus Method: Ideal for pre-revenue startups, focusing on risk reduction factors.",
+                self.styles['Normal']
+            ))
+        
+        if 'Market Multiples' in methods:
+            story.append(Paragraph(
+                "• Market Multiples: Provides market-based perspective, best used with comparable companies.",
+                self.styles['Normal']
+            ))
