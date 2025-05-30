@@ -60,22 +60,29 @@ def main():
     
 
     
-    # Method-specific interfaces
-    if method == "DCF (Discounted Cash Flow)":
-        dcf_interface()
-    elif method == "Market Multiples":
-        market_multiples_interface()
-    elif method == "Scorecard Method":
-        scorecard_interface()
-    elif method == "Berkus Method":
-        berkus_interface()
-    elif method == "Risk Factor Summation":
-        risk_factor_interface()
-    elif method == "Venture Capital Method":
-        vc_method_interface()
-    
-    # Display calculation history
-    display_calculation_history()
+    # Check if user wants to see test results
+    if st.session_state.get('show_tests', False):
+        display_test_interface()
+        if st.button("← Back to Valuation Methods"):
+            st.session_state.show_tests = False
+            st.rerun()
+    else:
+        # Method-specific interfaces
+        if method == "DCF (Discounted Cash Flow)":
+            dcf_interface()
+        elif method == "Market Multiples":
+            market_multiples_interface()
+        elif method == "Scorecard Method":
+            scorecard_interface()
+        elif method == "Berkus Method":
+            berkus_interface()
+        elif method == "Risk Factor Summation":
+            risk_factor_interface()
+        elif method == "Venture Capital Method":
+            vc_method_interface()
+        
+        # Display calculation history
+        display_calculation_history()
     
     # Export and PDF sections at bottom of page
     st.markdown("---")
@@ -1047,6 +1054,157 @@ def display_export_options():
             st.write("**Date Range:**")
             st.write(f"From: {metadata['date_range']['earliest']}")
             st.write(f"To: {metadata['date_range']['latest']}")
+
+def display_test_interface():
+    """Display automated testing interface"""
+    st.title("🧪 Automated Testing Suite")
+    st.markdown("Comprehensive testing for all valuation methods and core functionality")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("🚀 Run All Tests", type="primary"):
+            with st.spinner("Running comprehensive test suite..."):
+                try:
+                    result = run_test_suite()
+                    st.session_state.test_results = format_test_results(result)
+                except Exception as e:
+                    st.error(f"Test execution failed: {str(e)}")
+    
+    with col2:
+        if st.button("⚡ Quick Test", type="secondary"):
+            with st.spinner("Running quick validation tests..."):
+                try:
+                    result = run_test_suite()
+                    st.session_state.test_results = format_test_results(result)
+                except Exception as e:
+                    st.error(f"Quick test failed: {str(e)}")
+    
+    with col3:
+        if st.button("🔄 Clear Results"):
+            if 'test_results' in st.session_state:
+                del st.session_state.test_results
+            st.rerun()
+    
+    # Display test results if available
+    if 'test_results' in st.session_state:
+        display_test_results(st.session_state.test_results)
+
+def format_test_results(unittest_result):
+    """Format unittest results for display"""
+    total_tests = unittest_result.testsRun
+    failures = len(unittest_result.failures)
+    errors = len(unittest_result.errors)
+    success_count = total_tests - failures - errors
+    success_rate = (success_count / total_tests * 100) if total_tests > 0 else 0
+    
+    return {
+        'total_tests': total_tests,
+        'passed': success_count,
+        'failed': failures,
+        'errors': errors,
+        'success_rate': success_rate,
+        'was_successful': unittest_result.wasSuccessful(),
+        'failures_detail': unittest_result.failures,
+        'errors_detail': unittest_result.errors,
+        'execution_time': 0
+    }
+
+def display_test_results(results):
+    """Display formatted test results"""
+    st.markdown("---")
+    st.subheader("📊 Test Results")
+    
+    # Overview metrics
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total Tests", results['total_tests'])
+    
+    with col2:
+        st.metric("Passed", results['passed'])
+    
+    with col3:
+        st.metric("Failed", results['failed'])
+    
+    with col4:
+        st.metric("Success Rate", f"{results['success_rate']:.1f}%")
+    
+    # Status indicator
+    if results['was_successful']:
+        st.success("All tests passed successfully!")
+    elif results['errors'] > 0:
+        st.error("Critical errors detected - immediate attention required")
+    else:
+        st.warning("Some tests failed - review and fix issues")
+    
+    # Detailed results
+    if results['failed'] > 0 or results['errors'] > 0:
+        st.markdown("### 🔍 Detailed Results")
+        
+        if results['failures_detail']:
+            st.markdown("**Test Failures:**")
+            for test, traceback in results['failures_detail']:
+                with st.expander(f"❌ {test}"):
+                    st.code(traceback, language="python")
+        
+        if results['errors_detail']:
+            st.markdown("**Test Errors:**")
+            for test, traceback in results['errors_detail']:
+                with st.expander(f"🚨 {test}"):
+                    st.code(traceback, language="python")
+    
+    # Test coverage info
+    with st.expander("📋 Test Coverage Details"):
+        st.markdown("""
+        **Tested Components:**
+        - DCF Valuation Method
+        - Market Multiples Method  
+        - Scorecard Method
+        - Berkus Method
+        - Utility Functions
+        - Integration Workflows
+        
+        **Test Types:**
+        - Basic functionality tests
+        - Edge case handling
+        - Error validation
+        - Input validation
+        - Integration testing
+        """)
+    
+    # Export test results
+    if st.button("📥 Export Test Report"):
+        test_report = generate_test_report_text(results)
+        st.download_button(
+            label="Download Test Report",
+            data=test_report,
+            file_name=f"test_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            mime="text/plain"
+        )
+
+def generate_test_report_text(results):
+    """Generate a text report of test results"""
+    from datetime import datetime
+    
+    report_lines = []
+    
+    report_lines.append("STARTUP VALUATION CALCULATOR - TEST REPORT")
+    report_lines.append("=" * 60)
+    report_lines.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    report_lines.append("")
+    
+    # Summary
+    report_lines.append("SUMMARY")
+    report_lines.append("-" * 30)
+    report_lines.append(f"Total Tests: {results['total_tests']}")
+    report_lines.append(f"Passed: {results['passed']}")
+    report_lines.append(f"Failed: {results['failed']}")
+    report_lines.append(f"Errors: {results['errors']}")
+    report_lines.append(f"Success Rate: {results['success_rate']:.1f}%")
+    report_lines.append(f"Overall Status: {'PASS' if results['was_successful'] else 'FAIL'}")
+    
+    return "\n".join(report_lines)
 
 if __name__ == "__main__":
     main()
