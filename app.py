@@ -79,6 +79,24 @@ def main():
     
     # Display calculation history
     display_calculation_history()
+    
+    # Display export options if requested
+    if st.session_state.get('show_export', False):
+        st.markdown("---")
+        display_export_options()
+        # Reset export flag
+        if st.button("Close Export Panel"):
+            st.session_state.show_export = False
+            st.rerun()
+    
+    # Display PDF generation if requested
+    if st.session_state.get('show_pdf', False):
+        st.markdown("---")
+        generate_pdf_report()
+        # Reset PDF flag
+        if st.button("Close PDF Panel"):
+            st.session_state.show_pdf = False
+            st.rerun()
 
 def dcf_interface():
     """DCF method interface"""
