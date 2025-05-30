@@ -51,17 +51,7 @@ def main():
         ]
     )
     
-    # Sidebar sections
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📤 Export & Reports")
-    
-    # Export options
-    if st.sidebar.button("Export Data"):
-        st.session_state.show_export = True
-    
-    # PDF report
-    if st.sidebar.button("Generate PDF"):
-        st.session_state.show_pdf = True
+
     
     # Method-specific interfaces
     if method == "DCF (Discounted Cash Flow)":
@@ -80,23 +70,18 @@ def main():
     # Display calculation history
     display_calculation_history()
     
-    # Display export options if requested
-    if st.session_state.get('show_export', False):
-        st.markdown("---")
-        display_export_options()
-        # Reset export flag
-        if st.button("Close Export Panel"):
-            st.session_state.show_export = False
-            st.rerun()
+    # Export and PDF sections at bottom of page
+    st.markdown("---")
     
-    # Display PDF generation if requested
-    if st.session_state.get('show_pdf', False):
-        st.markdown("---")
-        generate_pdf_report()
-        # Reset PDF flag
-        if st.button("Close PDF Panel"):
-            st.session_state.show_pdf = False
-            st.rerun()
+    # Export Data Section
+    st.subheader("📤 Export Data")
+    display_export_options()
+    
+    st.markdown("---")
+    
+    # PDF Report Section
+    st.subheader("📄 Generate PDF Report")
+    generate_pdf_report()
 
 def dcf_interface():
     """DCF method interface"""
