@@ -249,7 +249,7 @@ class PDFGenerator:
     
     def _add_dcf_analysis(self, story: List, result: Dict):
         """Add DCF-specific analysis with visual chart"""
-        story.append(Paragraph("DCF Valuation Components", self.styles['Heading3']))
+        story.append(Paragraph("Valuation Components", self.styles['Heading4']))
         
         # Components table
         operating_value = result.get('operating_value', 0)
@@ -302,7 +302,7 @@ class PDFGenerator:
     
     def _add_multiples_analysis(self, story: List, result: Dict, current_results: Dict):
         """Add market multiples analysis"""
-        story.append(Paragraph("Market Multiples Analysis", self.styles['Heading3']))
+        story.append(Paragraph("Analysis Details", self.styles['Heading4']))
         
         sector = current_results.get('sector', 'Unknown')
         
@@ -332,7 +332,7 @@ class PDFGenerator:
     
     def _add_scorecard_analysis(self, story: List, result: Dict):
         """Add scorecard method analysis"""
-        story.append(Paragraph("Scorecard Method Analysis", self.styles['Heading3']))
+        story.append(Paragraph("Criteria Breakdown", self.styles['Heading4']))
         
         # Criteria analysis table
         criteria_data = [['Criterion', 'Score', 'Weight', 'Contribution']]
@@ -377,7 +377,7 @@ class PDFGenerator:
     
     def _add_berkus_analysis(self, story: List, result: Dict):
         """Add Berkus method analysis"""
-        story.append(Paragraph("Berkus Method Analysis", self.styles['Heading3']))
+        story.append(Paragraph("Value Breakdown", self.styles['Heading4']))
         
         # Breakdown table
         breakdown_data = [['Criterion', 'Score', 'Value Assigned']]
@@ -408,7 +408,7 @@ class PDFGenerator:
     
     def _add_risk_analysis(self, story: List, result: Dict):
         """Add risk factor analysis"""
-        story.append(Paragraph("Risk Factor Analysis", self.styles['Heading3']))
+        story.append(Paragraph("Risk Assessment", self.styles['Heading4']))
         
         # Risk factors table
         risk_data = [['Risk Factor', 'Rating', 'Adjustment']]
@@ -445,7 +445,7 @@ class PDFGenerator:
     
     def _add_vc_analysis(self, story: List, result: Dict, current_results: Dict):
         """Add VC method analysis"""
-        story.append(Paragraph("Venture Capital Method Analysis", self.styles['Heading3']))
+        story.append(Paragraph("Investment Structure", self.styles['Heading4']))
         
         include_investment = current_results.get('include_investment', False)
         
