@@ -183,13 +183,20 @@ def save_calculation_history(method: str, inputs: Dict[str, Any], result: Dict[s
         # Extract valuation from result
         valuation = result.get('valuation', 0)
         
+        # Get chart from current results if available
+        chart = None
+        if hasattr(st.session_state, 'current_results') and st.session_state.current_results:
+            chart = st.session_state.current_results.get('chart')
+        
         # Create history entry
         history_entry = {
+            'id': len(st.session_state.calculation_history),  # Simple ID for deletion
             'method': method,
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'valuation': valuation,
             'inputs': inputs,
-            'result': result
+            'result': result,
+            'chart': chart
         }
         
         # Add to history (keep last 50 entries)

@@ -161,7 +161,8 @@ def display_dcf_results(result, cash_flows):
     st.session_state.current_results = {
         "method": "DCF",
         "result": result,
-        "chart_data": {"cash_flows": cash_flows}
+        "chart_data": {"cash_flows": cash_flows},
+        "chart": fig
     }
 
 def market_multiples_interface():
@@ -262,7 +263,8 @@ def display_market_multiples_results(result, sector):
     st.session_state.current_results = {
         "method": "Market Multiples",
         "result": result,
-        "sector": sector
+        "sector": sector,
+        "chart": fig
     }
 
 def scorecard_interface():
@@ -376,7 +378,8 @@ def display_scorecard_results(result):
     # Store results
     st.session_state.current_results = {
         "method": "Scorecard",
-        "result": result
+        "result": result,
+        "chart": fig
     }
 
 def berkus_interface():
@@ -488,7 +491,8 @@ def display_berkus_results(result):
     # Store results
     st.session_state.current_results = {
         "method": "Berkus",
-        "result": result
+        "result": result,
+        "chart": fig
     }
 
 def risk_factor_interface():
@@ -626,7 +630,8 @@ def display_risk_factor_results(result):
     # Store results
     st.session_state.current_results = {
         "method": "Risk Factor Summation",
-        "result": result
+        "result": result,
+        "chart": fig
     }
 
 def vc_method_interface():
@@ -777,7 +782,8 @@ def display_vc_method_results(result, include_investment):
     st.session_state.current_results = {
         "method": "Venture Capital",
         "result": result,
-        "include_investment": include_investment
+        "include_investment": include_investment,
+        "chart": fig
     }
 
 def display_calculation_history():
@@ -789,17 +795,56 @@ def display_calculation_history():
         col1, col2 = st.columns([3, 1])
         
         with col1:
-            # Display last few calculations
-            for i, calc in enumerate(reversed(st.session_state.calculation_history[-5:])):
-                with st.expander(f"{calc['method']} - {calc['timestamp']}"):
-                    st.write(f"**Valuation:** {format_currency(calc['valuation'])}")
-                    st.json(calc['inputs'])
+            # Display all calculations with charts and delete options
+            for i, calc in enumerate(reversed(st.session_state.calculation_history)):
+                with st.expander(f"{calc['method']} - {calc['timestamp']} - {format_currency(calc['valuation'])}"):
+                    col_info, col_delete = st.columns([4, 1])
+                    
+                    with col_info:
+                        st.write(f"**Valuation:** {format_currency(calc['valuation'])}")
+                        
+                        # Display chart if available
+                        if calc.get('chart') is not None:
+                            st.plotly_chart(calc['chart'], use_container_width=True, key=f"chart_{calc.get('id', i)}")
+                        
+                        # Show key inputs summary
+                        if calc['method'] == "DCF":
+                            inputs = calc['inputs']
+                            st.write(f"**Discount Rate:** {inputs.get('discount_rate', 0)*100:.1f}%")
+                            st.write(f"**Terminal Growth:** {inputs.get('terminal_growth', 0)*100:.1f}%")
+                        elif calc['method'] == "Market Multiples":
+                            inputs = calc['inputs']
+                            st.write(f"**Sector:** {inputs.get('sector', 'N/A')}")
+                            st.write(f"**Multiple:** {inputs.get('multiple', 0):.1f}x")
+                        elif calc['method'] == "Berkus":
+                            result = calc['result']
+                            achievement = (result.get('valuation', 0) / result.get('max_possible', 1)) * 100
+                            st.write(f"**Achievement Rate:** {achievement:.1f}%")
+                        elif calc['method'] == "Scorecard":
+                            result = calc['result']
+                            st.write(f"**Base Valuation:** {format_currency(result.get('base_valuation', 0))}")
+                            st.write(f"**Adjustment Factor:** {result.get('adjustment_factor', 0):.2f}x")
+                        elif calc['method'] == "Risk Factor Summation":
+                            result = calc['result']
+                            st.write(f"**Base Valuation:** {format_currency(result.get('base_valuation', 0))}")
+                            st.write(f"**Risk Adjustment:** {result.get('total_adjustment', 0):+.1%}")
+                        elif calc['method'] == "Venture Capital":
+                            result = calc['result']
+                            st.write(f"**Exit Value:** {format_currency(result.get('exit_value', 0))}")
+                            st.write(f"**Present Value:** {format_currency(result.get('present_value', 0))}")
+                    
+                    with col_delete:
+                        if st.button("🗑️", key=f"delete_{calc.get('id', i)}", help="Delete this calculation"):
+                            # Remove this calculation from history
+                            original_index = len(st.session_state.calculation_history) - 1 - i
+                            del st.session_state.calculation_history[original_index]
+                            st.rerun()
         
         with col2:
-            if st.button("📄 Generate PDF Report"):
+            if st.button("📄 Export to PDF"):
                 generate_pdf_report()
             
-            if st.button("🗑️ Clear History"):
+            if st.button("🗑️ Clear All History"):
                 st.session_state.calculation_history = []
                 st.session_state.current_results = {}
                 st.rerun()

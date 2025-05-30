@@ -4,7 +4,7 @@ Creates comprehensive PDF reports for valuation calculations
 """
 
 from reportlab.lib.pagesizes import letter, A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
@@ -13,6 +13,8 @@ from datetime import datetime
 from io import BytesIO
 from typing import Dict, List, Any
 import json
+import tempfile
+import os
 
 class PDFGenerator:
     """Generate comprehensive PDF reports for startup valuations"""
