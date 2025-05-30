@@ -108,10 +108,10 @@ def dcf_interface():
                 st.error(f"Calculation Error: {result['error']}")
                 return
             
-            # Display results
-            display_dcf_results(result, cash_flows)
+            # Display results and get chart
+            chart_fig = display_dcf_results(result, cash_flows)
             
-            # Save to history
+            # Save to history with chart
             save_calculation_history(
                 method="DCF",
                 inputs={
@@ -119,14 +119,15 @@ def dcf_interface():
                     "discount_rate": discount_rate,
                     "terminal_growth": terminal_growth
                 },
-                result=result
+                result=result,
+                chart_fig=chart_fig
             )
             
         except Exception as e:
             st.error(f"Calculation failed: {str(e)}")
 
 def display_dcf_results(result, cash_flows):
-    """Display DCF calculation results"""
+    """Display DCF calculation results and return chart figure"""
     st.success("✅ DCF Calculation Complete")
     
     col1, col2, col3 = st.columns(3)
@@ -164,6 +165,8 @@ def display_dcf_results(result, cash_flows):
         "chart_data": {"cash_flows": cash_flows},
         "chart": fig
     }
+    
+    return fig
 
 def market_multiples_interface():
     """Market multiples method interface"""
