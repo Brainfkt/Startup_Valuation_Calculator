@@ -603,7 +603,7 @@ class PDFGenerator:
         story.append(Spacer(1, 0.3*inch))
 
     def _add_detailed_analysis_with_charts(self, story: List, calculation_history: List[Dict]):
-        """Add detailed analysis for each calculation"""
+        """Add detailed analysis for each calculation with chart data tables"""
         story.append(PageBreak())
         story.append(Paragraph("Detailed Analysis", self.styles['SectionHeader']))
         
@@ -612,6 +612,9 @@ class PDFGenerator:
             story.append(Paragraph(f"Performed on: {calc['timestamp']}", self.styles['Normal']))
             story.append(Paragraph(f"Valuation: {self._format_currency(calc['valuation'])}", self.styles['MetricValue']))
             story.append(Spacer(1, 0.2*inch))
+            
+            # Add chart data table if available
+            self._add_chart_data_table(story, calc)
             
             # Method-specific details
             if calc['method'] == "DCF":
@@ -689,3 +692,179 @@ class PDFGenerator:
                 "• Market Multiples: Provides market-based perspective, best used with comparable companies.",
                 self.styles['Normal']
             ))
+
+    def _add_chart_data_table(self, story: List, calc: Dict):
+        """Add chart data as tables to replace visual charts"""
+        story.append(Paragraph("Chart Data", self.styles['Heading4']))
+        
+        method = calc['method']
+        result = calc['result']
+        
+        if method == "DCF":
+            self._add_dcf_chart_data(story, calc)
+        elif method == "Market Multiples":
+            self._add_multiples_chart_data(story, calc)
+        elif method == "Scorecard":
+            self._add_scorecard_chart_data(story, calc)
+        elif method == "Berkus":
+            self._add_berkus_chart_data(story, calc)
+        elif method == "Risk Factor Summation":
+            self._add_risk_chart_data(story, calc)
+        elif method == "Venture Capital":
+            self._add_vc_chart_data(story, calc)
+        
+        story.append(Spacer(1, 0.2*inch))
+
+    def _add_dcf_chart_data(self, story: List, calc: Dict):
+        """Add DCF chart data table"""
+        result = calc['result']
+        inputs = calc['inputs']
+        
+        # Cash flows and present values table
+        if 'cash_flows' in inputs and 'discounted_flows' in result:
+            cash_flows = inputs['cash_flows']
+            discounted_flows = result['discounted_flows']
+            
+            dcf_data = [['Year', 'Cash Flow', 'Present Value']]
+            for i, (cf, pv) in enumerate(zip(cash_flows, discounted_flows)):
+                dcf_data.append([f"Year {i+1}", self._format_currency(cf), self._format_currency(pv)])
+            
+            # Add terminal value row
+            dcf_data.append(['Terminal Value', '-', self._format_currency(result.get('terminal_pv', 0))])
+            
+            dcf_table = Table(dcf_data, colWidths=[1.5*inch, 2*inch, 2*inch])
+            dcf_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white)
+            ]))
+            
+            story.append(dcf_table)
+
+    def _add_multiples_chart_data(self, story: List, calc: Dict):
+        """Add market multiples chart data table"""
+        result = calc['result']
+        inputs = calc['inputs']
+        
+        # Sector comparison data
+        from data_models import SECTOR_MULTIPLES
+        
+        sector = inputs.get('sector', '')
+        metric_type = result.get('metric_type', 'Revenue')
+        
+        mult_data = [['Sector', f'{metric_type} Multiple', 'Used']]
+        for sector_name, multiples in SECTOR_MULTIPLES.items():
+            is_used = "✓" if sector_name == sector else ""
+            mult_data.append([sector_name, f"{multiples[metric_type]:.1f}x", is_used])
+        
+        mult_table = Table(mult_data, colWidths=[2*inch, 1.5*inch, 0.8*inch])
+        mult_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white)
+        ]))
+        
+        story.append(mult_table)
+
+    def _add_scorecard_chart_data(self, story: List, calc: Dict):
+        """Add scorecard chart data table"""
+        result = calc['result']
+        criteria_analysis = result.get('criteria_analysis', {})
+        
+        score_data = [['Criterion', 'Score', 'Weight', 'Contribution']]
+        for criterion, data in criteria_analysis.items():
+            score_data.append([
+                criterion.title(),
+                f"{data['score']}/5",
+                f"{data['weight']:.1%}",
+                f"{data['contribution']:.3f}"
+            ])
+        
+        score_table = Table(score_data, colWidths=[2*inch, 1*inch, 1*inch, 1.5*inch])
+        score_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white)
+        ]))
+        
+        story.append(score_table)
+
+    def _add_berkus_chart_data(self, story: List, calc: Dict):
+        """Add Berkus chart data table"""
+        result = calc['result']
+        breakdown = result.get('breakdown', {})
+        
+        berkus_data = [['Criterion', 'Score', 'Value', 'Max Value']]
+        for criterion, data in breakdown.items():
+            berkus_data.append([
+                data['name'],
+                f"{data['score']}/5",
+                self._format_currency(data['value']),
+                "€500K"
+            ])
+        
+        berkus_table = Table(berkus_data, colWidths=[2.5*inch, 1*inch, 1.2*inch, 1*inch])
+        berkus_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white)
+        ]))
+        
+        story.append(berkus_table)
+
+    def _add_risk_chart_data(self, story: List, calc: Dict):
+        """Add risk factor chart data table"""
+        result = calc['result']
+        risk_analysis = result.get('risk_analysis', {})
+        
+        risk_data = [['Risk Factor', 'Rating', 'Adjustment']]
+        for factor, data in risk_analysis.items():
+            risk_data.append([
+                data['name'],
+                f"{data['rating']:+d}",
+                f"{data['adjustment']:+.1%}"
+            ])
+        
+        risk_table = Table(risk_data, colWidths=[3*inch, 1*inch, 1.5*inch])
+        risk_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white)
+        ]))
+        
+        story.append(risk_table)
+
+    def _add_vc_chart_data(self, story: List, calc: Dict):
+        """Add VC method chart data table"""
+        result = calc['result']
+        
+        vc_data = [['Metric', 'Value']]
+        vc_data.append(['Exit Value', self._format_currency(result.get('exit_value', 0))])
+        vc_data.append(['Present Value', self._format_currency(result.get('present_value', 0))])
+        vc_data.append(['Return Multiple', f"{result.get('expected_return_multiple', 0):.1f}x"])
+        vc_data.append(['Annualized Return', f"{result.get('annualized_return', 0):.1%}"])
+        
+        if 'ownership_percentage' in result:
+            vc_data.append(['Ownership %', f"{result.get('ownership_percentage', 0):.1%}"])
+            vc_data.append(['Investment Needed', self._format_currency(result.get('investment_needed', 0))])
+        
+        vc_table = Table(vc_data, colWidths=[2.5*inch, 2.5*inch])
+        vc_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white)
+        ]))
+        
+        story.append(vc_table)
