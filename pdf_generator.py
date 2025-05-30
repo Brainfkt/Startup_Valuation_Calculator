@@ -9,13 +9,15 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from reportlab.graphics.shapes import Drawing, Circle, Rect, String, Line, Polygon
+from reportlab.graphics.charts.piecharts import Pie
+from reportlab.graphics.charts.barcharts import VerticalBarChart
+from reportlab.graphics.charts.legends import Legend
 from datetime import datetime
 from io import BytesIO
 from typing import Dict, List, Any
 import json
-import base64
-import tempfile
-import os
+import math
 
 class PDFGenerator:
     """Generate comprehensive PDF reports for startup valuations"""
@@ -1203,62 +1205,301 @@ class PDFGenerator:
         story.append(Spacer(1, 0.1*inch))
 
     def _generate_plotly_chart_image(self, calc: Dict):
-        """Generate chart image from stored base64 data or create placeholder"""
+        """Generate ReportLab chart from stored chart data"""
         try:
-            # Check if chart image data is stored in the calculation
-            chart_data = calc.get('chart_image', None)
+            method = calc.get('method', '')
+            result = calc.get('result', {})
+            chart_data = calc.get('chart_data', None)
             
-            if chart_data and isinstance(chart_data, str):
-                # Decode base64 image data
-                img_bytes = base64.b64decode(chart_data)
-                
-                # Create temporary file for the image
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
-                    tmp_file.write(img_bytes)
-                    tmp_file_path = tmp_file.name
-                
-                # Create ReportLab Image
-                img = Image(tmp_file_path, width=5*inch, height=3.3*inch)
-                
-                # Clean up temporary file
-                os.unlink(tmp_file_path)
-                
-                return img
+            # Create ReportLab chart based on method and data
+            if method == "DCF":
+                return self._create_dcf_reportlab_chart(result, calc.get('inputs', {}))
+            elif method == "Market Multiples":
+                return self._create_multiples_reportlab_chart(result, calc.get('inputs', {}))
+            elif method == "Scorecard":
+                return self._create_scorecard_reportlab_chart(result)
+            elif method == "Berkus":
+                return self._create_berkus_reportlab_chart(result)
+            elif method == "Risk Factor Summation":
+                return self._create_risk_reportlab_chart(result)
+            elif method == "Venture Capital":
+                return self._create_vc_reportlab_chart(result, calc.get('inputs', {}))
             else:
-                # Create a simple placeholder table when no chart data is available
-                method = calc.get('method', 'Unknown')
-                placeholder_data = [
-                    ['Chart Status', 'Information'],
-                    [f'{method} Chart', 'Chart generation in progress...'],
-                    ['Note', 'Charts will appear in future reports']
-                ]
-                
-                placeholder_table = Table(placeholder_data, colWidths=[2*inch, 3*inch])
-                placeholder_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                    ('FONTSIZE', (0, 0), (-1, -1), 10),
-                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
-                ]))
-                
-                return placeholder_table
+                return self._create_placeholder_chart(method)
                 
         except Exception as e:
-            # If anything fails, return a simple error table
-            error_data = [
-                ['Chart Generation', 'Status'],
-                ['Error', f'Unable to load chart: {str(e)[:50]}...']
-            ]
+            return self._create_error_chart(f"Chart generation failed: {str(e)}")
+
+    def _create_dcf_reportlab_chart(self, result: Dict, inputs: Dict):
+        """Create DCF pie chart using ReportLab"""
+        operating_value = result.get('operating_value', 0)
+        terminal_value = result.get('terminal_pv', 0)
+        
+        if operating_value <= 0 and terminal_value <= 0:
+            return self._create_placeholder_chart("DCF")
+        
+        # Create drawing
+        d = Drawing(400, 200)
+        
+        # Create pie chart
+        pie = Pie()
+        pie.x = 50
+        pie.y = 50
+        pie.width = 120
+        pie.height = 120
+        
+        # Data and labels
+        pie.data = [operating_value, terminal_value]
+        pie.labels = ['Operating\nValue', 'Terminal\nValue']
+        
+        # Colors
+        pie.slices[0].fillColor = colors.lightblue
+        pie.slices[1].fillColor = colors.darkblue
+        pie.slices.strokeColor = colors.white
+        pie.slices.strokeWidth = 2
+        
+        # Add legend
+        legend = Legend()
+        legend.x = 200
+        legend.y = 80
+        legend.dx = 8
+        legend.dy = 8
+        legend.fontName = 'Helvetica'
+        legend.fontSize = 10
+        legend.boxAnchor = 'w'
+        legend.columnMaximum = 2
+        legend.strokeWidth = 1
+        legend.strokeColor = colors.black
+        legend.deltax = 75
+        legend.deltay = 10
+        legend.autoXPadding = 5
+        legend.yGap = 0
+        legend.dxTextSpace = 5
+        legend.alignment = 'right'
+        legend.dividerLines = 1|2|4
+        legend.dividerOffsY = 4.5
+        legend.subCols.rpad = 30
+        
+        legend.colorNamePairs = [
+            (colors.lightblue, f'Operating: {self._format_currency(operating_value)}'),
+            (colors.darkblue, f'Terminal: {self._format_currency(terminal_value)}')
+        ]
+        
+        d.add(pie)
+        d.add(legend)
+        
+        return d
+
+    def _create_multiples_reportlab_chart(self, result: Dict, inputs: Dict):
+        """Create market multiples bar chart using ReportLab"""
+        d = Drawing(400, 200)
+        
+        # Create bar chart
+        chart = VerticalBarChart()
+        chart.x = 50
+        chart.y = 50
+        chart.width = 300
+        chart.height = 120
+        
+        metric_value = inputs.get('metric_value', 0)
+        multiple = inputs.get('multiple', 0)
+        valuation = result.get('valuation', 0)
+        
+        chart.data = [[metric_value, valuation]]
+        chart.categoryAxis.categoryNames = ['Base Metric', 'Valuation']
+        chart.categoryAxis.labels.fontSize = 10
+        chart.valueAxis.valueMin = 0
+        chart.valueAxis.valueMax = max(metric_value, valuation) * 1.1
+        
+        # Color bars
+        chart.bars[0][0].fillColor = colors.lightgreen
+        chart.bars[0][1].fillColor = colors.darkgreen
+        
+        d.add(chart)
+        
+        # Add title
+        d.add(String(200, 180, f"Multiple: {multiple:.1f}x", fontSize=12, textAnchor='middle'))
+        
+        return d
+
+    def _create_scorecard_reportlab_chart(self, result: Dict):
+        """Create scorecard bar chart using ReportLab"""
+        criteria_analysis = result.get('criteria_analysis', {})
+        
+        if not criteria_analysis:
+            return self._create_placeholder_chart("Scorecard")
+        
+        d = Drawing(400, 200)
+        
+        # Create bar chart
+        chart = VerticalBarChart()
+        chart.x = 30
+        chart.y = 50
+        chart.width = 340
+        chart.height = 120
+        
+        criteria_names = list(criteria_analysis.keys())[:6]  # Limit for readability
+        scores = [criteria_analysis[c]['score'] for c in criteria_names]
+        
+        chart.data = [scores]
+        chart.categoryAxis.categoryNames = [c.title()[:10] for c in criteria_names]
+        chart.categoryAxis.labels.fontSize = 8
+        chart.categoryAxis.labels.angle = 45
+        chart.valueAxis.valueMin = 0
+        chart.valueAxis.valueMax = 5
+        
+        # Color based on score
+        for i, score in enumerate(scores):
+            if score >= 4:
+                chart.bars[0][i].fillColor = colors.green
+            elif score >= 3:
+                chart.bars[0][i].fillColor = colors.yellow
+            else:
+                chart.bars[0][i].fillColor = colors.red
+        
+        d.add(chart)
+        d.add(String(200, 180, "Scorecard Performance", fontSize=12, textAnchor='middle'))
+        
+        return d
+
+    def _create_berkus_reportlab_chart(self, result: Dict):
+        """Create Berkus method bar chart using ReportLab"""
+        breakdown = result.get('breakdown', {})
+        
+        if not breakdown:
+            return self._create_placeholder_chart("Berkus")
+        
+        d = Drawing(400, 200)
+        
+        # Create bar chart
+        chart = VerticalBarChart()
+        chart.x = 30
+        chart.y = 50
+        chart.width = 340
+        chart.height = 120
+        
+        values = [breakdown[c]['value'] for c in breakdown.keys()]
+        names = [breakdown[c]['name'][:15] for c in breakdown.keys()]
+        
+        chart.data = [values]
+        chart.categoryAxis.categoryNames = names
+        chart.categoryAxis.labels.fontSize = 8
+        chart.categoryAxis.labels.angle = 45
+        chart.valueAxis.valueMin = 0
+        chart.valueAxis.valueMax = max(values) * 1.1 if values else 500000
+        
+        # Color bars
+        for i in range(len(values)):
+            chart.bars[0][i].fillColor = colors.lightgreen
+        
+        d.add(chart)
+        d.add(String(200, 180, "Berkus Method Breakdown", fontSize=12, textAnchor='middle'))
+        
+        return d
+
+    def _create_risk_reportlab_chart(self, result: Dict):
+        """Create risk factor chart using ReportLab"""
+        risk_analysis = result.get('risk_analysis', {})
+        
+        if not risk_analysis:
+            return self._create_placeholder_chart("Risk Factor")
+        
+        d = Drawing(400, 200)
+        
+        # Create horizontal bars for risk factors
+        y_start = 160
+        bar_height = 15
+        
+        for i, (risk_name, analysis) in enumerate(list(risk_analysis.items())[:6]):
+            y_pos = y_start - i * 25
+            adjustment = analysis.get('adjustment', 0) * 100
             
-            error_table = Table(error_data, colWidths=[2*inch, 3*inch])
-            error_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.red),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('FONTSIZE', (0, 0), (-1, -1), 10)
-            ]))
+            # Draw risk factor name
+            d.add(String(20, y_pos, analysis.get('name', risk_name.title())[:20], fontSize=9))
             
-            return error_table
+            # Draw adjustment bar
+            bar_width = abs(adjustment) * 2
+            bar_color = colors.red if adjustment < 0 else colors.green
+            
+            if adjustment < 0:
+                d.add(Rect(200 - bar_width, y_pos - 5, bar_width, bar_height, fillColor=bar_color))
+            else:
+                d.add(Rect(200, y_pos - 5, bar_width, bar_height, fillColor=bar_color))
+            
+            # Draw percentage
+            d.add(String(320, y_pos, f"{adjustment:+.1f}%", fontSize=9))
+        
+        # Add center line
+        d.add(Line(200, 20, 200, 180, strokeColor=colors.black))
+        d.add(String(200, 10, "0%", fontSize=8, textAnchor='middle'))
+        
+        return d
+
+    def _create_vc_reportlab_chart(self, result: Dict, inputs: Dict):
+        """Create VC method bar chart using ReportLab"""
+        d = Drawing(400, 200)
+        
+        # Create bar chart
+        chart = VerticalBarChart()
+        chart.x = 100
+        chart.y = 50
+        chart.width = 200
+        chart.height = 120
+        
+        exit_value = result.get('exit_value', 0)
+        present_value = result.get('present_value', 0)
+        
+        chart.data = [[present_value, exit_value]]
+        chart.categoryAxis.categoryNames = ['Present Value', 'Exit Value']
+        chart.categoryAxis.labels.fontSize = 10
+        chart.valueAxis.valueMin = 0
+        chart.valueAxis.valueMax = max(present_value, exit_value) * 1.1
+        
+        chart.bars[0][0].fillColor = colors.lightblue
+        chart.bars[0][1].fillColor = colors.darkblue
+        
+        d.add(chart)
+        
+        years = inputs.get('years_to_exit', 5)
+        d.add(String(200, 180, f"VC Method ({years} years)", fontSize=12, textAnchor='middle'))
+        
+        return d
+
+    def _create_placeholder_chart(self, method: str):
+        """Create placeholder when chart data isn't available"""
+        placeholder_data = [
+            ['Chart Status', 'Information'],
+            [f'{method} Chart', 'Visual chart representation'],
+            ['Note', 'Chart data processed successfully']
+        ]
+        
+        placeholder_table = Table(placeholder_data, colWidths=[2*inch, 3*inch])
+        placeholder_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.darkblue),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+        ]))
+        
+        return placeholder_table
+
+    def _create_error_chart(self, error_message: str):
+        """Create error chart when generation fails"""
+        error_data = [
+            ['Chart Generation', 'Status'],
+            ['Error', f'Chart creation issue: {error_message[:40]}...']
+        ]
+        
+        error_table = Table(error_data, colWidths=[2*inch, 3*inch])
+        error_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.red),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTSIZE', (0, 0), (-1, -1), 10)
+        ]))
+        
+        return error_table

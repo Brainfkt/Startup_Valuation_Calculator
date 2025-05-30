@@ -194,18 +194,24 @@ def save_calculation_history(method: str, inputs: Dict[str, Any], result: Dict[s
             'result': result
         }
         
-        # Add chart image data if provided
+        # Add chart data if provided
         if chart_fig:
             try:
+                # Store chart data structure for recreation in PDF
+                chart_data = {
+                    'data': chart_fig.data,
+                    'layout': chart_fig.layout,
+                    'config': getattr(chart_fig, '_config', {})
+                }
+                
+                # Convert to JSON-serializable format
                 import plotly.io as pio
-                import base64
-                # Convert chart to base64 encoded PNG
-                img_bytes = pio.to_image(chart_fig, format='png', width=800, height=500, scale=2)
-                img_base64 = base64.b64encode(img_bytes).decode('utf-8')
-                history_entry['chart_image'] = img_base64
+                chart_json = pio.to_json(chart_fig)
+                history_entry['chart_data'] = chart_json
+                
             except Exception as e:
-                print(f"Could not save chart image: {e}")
-                # Continue without chart image
+                print(f"Could not save chart data: {e}")
+                # Continue without chart data
         
         # Add to history (keep last 50 entries)
         st.session_state.calculation_history.append(history_entry)
