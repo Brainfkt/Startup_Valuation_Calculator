@@ -15,9 +15,10 @@ from reportlab.graphics.charts.barcharts import VerticalBarChart
 from reportlab.graphics.charts.legends import Legend
 from datetime import datetime
 from io import BytesIO
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 import json
 import math
+import matplotlib.ticker as ticker
 from pdf_chart_generator import PDFChartGenerator
 
 class PDFGenerator:
@@ -101,13 +102,17 @@ class PDFGenerator:
             if calculation_history:
                 self._add_comprehensive_summary(story, calculation_history)
             
-            # Detailed analysis for current calculation only
-            if current_results:
-                self._add_detailed_analysis(story, current_results)
+            # Detailed analysis for all calculations with charts
+            if calculation_history:
+                self._add_detailed_analysis_with_charts(story, calculation_history)
             
             # Comparative analysis
             if len(calculation_history) > 1:
                 self._add_comparative_analysis(story, calculation_history)
+            
+            # Visual Charts Section - All charts from the application
+            if calculation_history:
+                self._add_visual_charts_section(story, calculation_history)
             
             # Appendices
             self._add_appendices(story)
@@ -546,6 +551,150 @@ class PDFGenerator:
         
         story.append(history_table)
     
+    def _add_visual_charts_section(self, story: List, calculation_history: List[Dict]):
+        """Add dedicated visual charts section with all charts from the application"""
+        story.append(PageBreak())
+        story.append(Paragraph("Visual Charts", self.styles['SectionHeader']))
+        story.append(Paragraph(
+            "This section contains all the visual charts generated for each valuation method performed in the application.",
+            self.styles['Normal']
+        ))
+        story.append(Spacer(1, 0.3*inch))
+        
+        for calc in calculation_history:
+            method = calc.get('method', 'Unknown')
+            result = calc.get('result', {})
+            timestamp = calc.get('timestamp', 'Unknown')
+            
+            # Add method header
+            story.append(Paragraph(f"{method} Analysis Chart", self.styles['Heading3']))
+            story.append(Paragraph(f"Generated: {timestamp}", self.styles['Normal']))
+            story.append(Spacer(1, 0.1*inch))
+            
+            # Generate and add chart based on method
+            try:
+                chart_data = {
+                    'result': result,
+                    'inputs': calc.get('inputs', {}),
+                    'method': method
+                }
+                
+                chart_path = None
+                if method == "DCF":
+                    chart_path = self.chart_generator.create_dcf_chart(chart_data)
+                elif method == "Market Multiples":
+                    chart_path = self.chart_generator.create_multiples_chart(chart_data)
+                elif method == "Scorecard":
+                    chart_path = self.chart_generator.create_scorecard_chart(chart_data)
+                elif method == "Berkus":
+                    chart_path = self.chart_generator.create_berkus_chart(chart_data)
+                elif method == "Risk Factor Summation":
+                    # Create a simple risk factor chart
+                    chart_path = self._create_risk_factor_visual_chart(result)
+                elif method == "Venture Capital":
+                    # Create a simple VC method chart
+                    chart_path = self._create_vc_method_visual_chart(result)
+                
+                if chart_path:
+                    chart_image = self.chart_generator.create_reportlab_image(
+                        chart_path, width=7*inch, height=4*inch
+                    )
+                    story.append(chart_image)
+                else:
+                    story.append(Paragraph(
+                        f"Chart generation not available for {method} method.",
+                        self.styles['Normal']
+                    ))
+                    
+            except Exception as e:
+                story.append(Paragraph(
+                    f"Error generating chart for {method}: {str(e)[:100]}...",
+                    self.styles['Normal']
+                ))
+            
+            story.append(Spacer(1, 0.3*inch))
+    
+    def _create_risk_factor_visual_chart(self, result: Dict) -> Optional[str]:
+        """Create a simple risk factor visualization"""
+        try:
+            import matplotlib.pyplot as plt
+            
+            fig, ax = plt.subplots(figsize=(8, 5))
+            fig.patch.set_facecolor('white')
+            
+            risk_analysis = result.get('risk_analysis', {})
+            if not risk_analysis:
+                ax.text(0.5, 0.5, 'No Risk Factors Applied', 
+                       ha='center', va='center', fontsize=14)
+                ax.set_xlim(0, 1)
+                ax.set_ylim(0, 1)
+                ax.axis('off')
+            else:
+                factors = list(risk_analysis.keys())
+                adjustments = [data.get('adjustment', 0) * 100 for data in risk_analysis.values()]
+                
+                bars = ax.barh(factors, adjustments)
+                ax.set_xlabel('Risk Adjustment (%)')
+                ax.set_title('Risk Factor Analysis')
+                ax.grid(True, alpha=0.3)
+                
+                # Color bars based on positive/negative
+                for bar, adj in zip(bars, adjustments):
+                    if adj > 0:
+                        bar.set_color('red')
+                    elif adj < 0:
+                        bar.set_color('green')
+                    else:
+                        bar.set_color('gray')
+            
+            plt.tight_layout()
+            return self.chart_generator._save_chart_to_temp(fig)
+            
+        except Exception:
+            return None
+    
+    def _create_vc_method_visual_chart(self, result: Dict) -> Optional[str]:
+        """Create a simple VC method visualization"""
+        try:
+            import matplotlib.pyplot as plt
+            import matplotlib.ticker as ticker
+            
+            fig, ax = plt.subplots(figsize=(8, 5))
+            fig.patch.set_facecolor('white')
+            
+            exit_value = result.get('exit_value', 0)
+            present_value = result.get('present_value', 0)
+            
+            if exit_value > 0 and present_value > 0:
+                categories = ['Present Value', 'Exit Value']
+                values = [present_value, exit_value]
+                
+                bars = ax.bar(categories, values)
+                ax.set_ylabel('Value (€)')
+                ax.set_title('VC Method - Present vs Exit Value')
+                ax.grid(True, alpha=0.3)
+                
+                # Format y-axis
+                ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, p: f'€{x/1000000:.1f}M'))
+                
+                # Add value labels
+                for bar, value in zip(bars, values):
+                    height = bar.get_height()
+                    ax.text(bar.get_x() + bar.get_width()/2., height,
+                           f'€{value/1000000:.1f}M', ha='center', va='bottom')
+            else:
+                ax.text(0.5, 0.5, 'Insufficient VC Method Data', 
+                       ha='center', va='center', fontsize=14)
+                ax.set_xlim(0, 1)
+                ax.set_ylim(0, 1)
+                ax.axis('off')
+            
+            plt.tight_layout()
+            return self.chart_generator._save_chart_to_temp(fig)
+            
+        except Exception:
+            return None
+
     def _add_appendices(self, story: List):
         """Add appendices section"""
         story.append(PageBreak())
