@@ -15,7 +15,7 @@ from chart_generator import ChartGenerator
 from pdf_generator import PDFGenerator
 from data_models import SECTOR_MULTIPLES, ValidationResult
 from utils import format_currency, validate_positive_number, save_calculation_history
-from export_manager import ExportManager
+from export_manager_simple import ExportManager
 
 # Page configuration
 st.set_page_config(
@@ -898,8 +898,6 @@ def display_export_options():
     if not st.session_state.calculation_history:
         st.info("No calculations available for export. Please perform calculations first.")
         return
-    
-    st.subheader("📤 Export Data")
     
     export_manager = ExportManager()
     

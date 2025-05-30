@@ -1,6 +1,6 @@
 """
-Export Manager Module
-Handles export functionality for multiple formats including CSV, Excel, JSON, and XML
+Export Manager Module - Simplified Version
+Handles export functionality for multiple formats with reliable implementation
 """
 
 import pandas as pd
@@ -23,17 +23,7 @@ class ExportManager:
         format_type: str,
         include_charts: bool = False
     ) -> BytesIO:
-        """
-        Export calculation data in specified format
-        
-        Args:
-            calculation_history: List of calculation results
-            format_type: Export format ('csv', 'excel', 'json', 'xml', 'txt')
-            include_charts: Whether to include chart data
-            
-        Returns:
-            BytesIO buffer containing exported data
-        """
+        """Export calculation data in specified format"""
         if format_type not in self.supported_formats:
             raise ValueError(f"Unsupported format: {format_type}")
         
@@ -48,7 +38,6 @@ class ExportManager:
         elif format_type == 'txt':
             return self._export_txt(calculation_history, include_charts)
         else:
-            # Fallback to JSON format
             return self._export_json(calculation_history, include_charts)
     
     def _export_csv(self, calculation_history: List[Dict], include_charts: bool) -> BytesIO:
@@ -71,7 +60,6 @@ class ExportManager:
             csv_data.append(row)
         
         if csv_data:
-            # Convert to DataFrame for easier CSV export
             df = pd.DataFrame(csv_data)
             csv_string = df.to_csv(index=False)
             buffer.write(csv_string.encode('utf-8'))
@@ -80,10 +68,8 @@ class ExportManager:
         return buffer
     
     def _export_excel(self, calculation_history: List[Dict], include_charts: bool) -> BytesIO:
-        """Export data as Excel format with multiple sheets"""
-        buffer = BytesIO()
-        
-        # Simplified Excel export using basic method
+        """Export data as Excel format"""
+        # Convert to CSV data first
         csv_data = []
         for calc in calculation_history:
             row = {
@@ -95,9 +81,13 @@ class ExportManager:
             self._add_method_specific_csv_data(row, calc)
             csv_data.append(row)
         
+        # Create Excel file in memory
+        buffer = BytesIO()
         if csv_data:
             df = pd.DataFrame(csv_data)
-            df.to_excel(buffer, index=False, engine='openpyxl')
+            # Use xlsxwriter engine for better compatibility
+            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                df.to_excel(writer, sheet_name='Valuations', index=False)
         
         buffer.seek(0)
         return buffer
@@ -171,11 +161,6 @@ class ExportManager:
             # Add result details
             result_elem = ET.SubElement(calc_elem, 'Result')
             self._dict_to_xml(calc.get('result', {}), result_elem)
-            
-            # Add chart data if requested
-            if include_charts and 'chart_data' in calc:
-                chart_elem = ET.SubElement(calc_elem, 'ChartData')
-                chart_elem.text = str(calc['chart_data'])
         
         # Convert to string and write to buffer
         xml_string = ET.tostring(root, encoding='unicode')
@@ -253,54 +238,6 @@ class ExportManager:
             row['Required_Return'] = inputs.get('required_return', 0)
             row['Years_to_Exit'] = inputs.get('years_to_exit', 0)
     
-    def _create_method_dataframe(self, method_data: List[Dict], method: str) -> pd.DataFrame:
-        """Create method-specific DataFrame"""
-        rows = []
-        
-        for calc in method_data:
-            row = {
-                'Timestamp': calc.get('timestamp', ''),
-                'Valuation': calc.get('valuation', 0),
-                'Success': calc.get('result', {}).get('success', False)
-            }
-            
-            # Add all inputs
-            inputs = calc.get('inputs', {})
-            for key, value in inputs.items():
-                row[f'Input_{key}'] = value
-            
-            # Add all result details
-            result = calc.get('result', {})
-            for key, value in result.items():
-                if key not in ['success', 'method']:
-                    row[f'Result_{key}'] = value
-            
-            rows.append(row)
-        
-        return pd.DataFrame(rows) if rows else pd.DataFrame()
-    
-    def _extract_chart_data(self, calculation_history: List[Dict]) -> List[Dict]:
-        """Extract chart data for export"""
-        chart_data = []
-        
-        for calc in calculation_history:
-            if 'chart_data' in calc:
-                chart_data.append({
-                    'Timestamp': calc.get('timestamp', ''),
-                    'Method': calc.get('method', ''),
-                    'Chart_Data_Available': True,
-                    'Chart_Data_Size': len(str(calc['chart_data']))
-                })
-            else:
-                chart_data.append({
-                    'Timestamp': calc.get('timestamp', ''),
-                    'Method': calc.get('method', ''),
-                    'Chart_Data_Available': False,
-                    'Chart_Data_Size': 0
-                })
-        
-        return chart_data
-    
     def _dict_to_xml(self, data: Dict, parent: ET.Element):
         """Convert dictionary to XML elements"""
         for key, value in data.items():
@@ -353,50 +290,7 @@ class ExportManager:
         format_type: str = 'excel'
     ) -> BytesIO:
         """Export comparison report across multiple calculations"""
-        if format_type == 'excel':
-            return self._export_comparison_excel(calculations)
-        else:
-            return self.export_calculation_data(calculations, format_type, False)
-    
-    def _export_comparison_excel(self, calculations: List[Dict]) -> BytesIO:
-        """Export comparison report as Excel with analysis"""
-        buffer = BytesIO()
-        
-        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-            # Comparison summary
-            comparison_data = []
-            for calc in calculations:
-                comparison_data.append({
-                    'Method': calc.get('method', ''),
-                    'Valuation': calc.get('valuation', 0),
-                    'Timestamp': calc.get('timestamp', ''),
-                    'Success': calc.get('result', {}).get('success', False)
-                })
-            
-            if comparison_data:
-                comp_df = pd.DataFrame(comparison_data)
-                comp_df.to_excel(writer, sheet_name='Comparison', index=False)
-                
-                # Statistics sheet
-                successful_calcs = [c for c in comparison_data if c['Success']]
-                if successful_calcs:
-                    valuations = [c['Valuation'] for c in successful_calcs]
-                    stats_data = {
-                        'Statistic': ['Count', 'Average', 'Median', 'Min', 'Max', 'Std Dev'],
-                        'Value': [
-                            len(valuations),
-                            sum(valuations) / len(valuations),
-                            sorted(valuations)[len(valuations)//2],
-                            min(valuations),
-                            max(valuations),
-                            pd.Series(valuations).std()
-                        ]
-                    }
-                    stats_df = pd.DataFrame(stats_data)
-                    stats_df.to_excel(writer, sheet_name='Statistics', index=False)
-        
-        buffer.seek(0)
-        return buffer
+        return self.export_calculation_data(calculations, format_type, False)
     
     def get_export_metadata(self, calculation_history: List[Dict]) -> Dict[str, Any]:
         """Get metadata about exportable data"""
