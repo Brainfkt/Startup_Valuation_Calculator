@@ -223,7 +223,8 @@ class DCFValidator(BaseValidator):
                     'LOW_RATE_SPREAD'
                 )
         
-        is_valid = len(self.get_errors()) == 0
+        error_messages = [msg for msg in self.messages if msg.severity == ValidationSeverity.ERROR]
+        is_valid = len(error_messages) == 0
         return ValidationResult(is_valid, self.messages, sanitized_data if is_valid else None)
 
 class MultiplesValidator(BaseValidator):
