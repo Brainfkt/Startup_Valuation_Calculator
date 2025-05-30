@@ -4,19 +4,18 @@ Creates comprehensive PDF reports for valuation calculations
 """
 
 from reportlab.lib.pagesizes import letter, A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
-from reportlab.graphics.shapes import Drawing, Circle, Rect, String, Line, Polygon
-from reportlab.graphics.charts.piecharts import Pie
-from reportlab.graphics.charts.barcharts import VerticalBarChart
-from reportlab.graphics.charts.legends import Legend
 from datetime import datetime
 from io import BytesIO
 from typing import Dict, List, Any
 import json
+import base64
+import tempfile
+import os
 
 class PDFGenerator:
     """Generate comprehensive PDF reports for startup valuations"""
@@ -696,30 +695,30 @@ class PDFGenerator:
             ))
 
     def _add_chart_data_table(self, story: List, calc: Dict):
-        """Add visual charts and data tables"""
+        """Add Plotly charts as images and data tables"""
         story.append(Paragraph("Visual Analysis", self.styles['Heading4']))
         
         method = calc['method']
         result = calc['result']
         
-        # Add ReportLab charts
+        # Generate and add Plotly chart as image
+        chart_image = self._generate_plotly_chart_image(calc)
+        if chart_image:
+            story.append(chart_image)
+            story.append(Spacer(1, 0.1*inch))
+        
+        # Add styled data tables
         if method == "DCF":
-            self._add_dcf_visual_chart(story, calc)
             self._add_dcf_chart_data(story, calc)
         elif method == "Market Multiples":
-            self._add_multiples_visual_chart(story, calc)
             self._add_multiples_chart_data(story, calc)
         elif method == "Scorecard":
-            self._add_scorecard_visual_chart(story, calc)
             self._add_scorecard_chart_data(story, calc)
         elif method == "Berkus":
-            self._add_berkus_visual_chart(story, calc)
             self._add_berkus_chart_data(story, calc)
         elif method == "Risk Factor Summation":
-            self._add_risk_visual_chart(story, calc)
             self._add_risk_chart_data(story, calc)
         elif method == "Venture Capital":
-            self._add_vc_visual_chart(story, calc)
             self._add_vc_chart_data(story, calc)
         
         story.append(Spacer(1, 0.2*inch))
@@ -1202,3 +1201,64 @@ class PDFGenerator:
         
         story.append(vc_table)
         story.append(Spacer(1, 0.1*inch))
+
+    def _generate_plotly_chart_image(self, calc: Dict):
+        """Generate chart image from stored base64 data or create placeholder"""
+        try:
+            # Check if chart image data is stored in the calculation
+            chart_data = calc.get('chart_image', None)
+            
+            if chart_data and isinstance(chart_data, str):
+                # Decode base64 image data
+                img_bytes = base64.b64decode(chart_data)
+                
+                # Create temporary file for the image
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
+                    tmp_file.write(img_bytes)
+                    tmp_file_path = tmp_file.name
+                
+                # Create ReportLab Image
+                img = Image(tmp_file_path, width=5*inch, height=3.3*inch)
+                
+                # Clean up temporary file
+                os.unlink(tmp_file_path)
+                
+                return img
+            else:
+                # Create a simple placeholder table when no chart data is available
+                method = calc.get('method', 'Unknown')
+                placeholder_data = [
+                    ['Chart Status', 'Information'],
+                    [f'{method} Chart', 'Chart generation in progress...'],
+                    ['Note', 'Charts will appear in future reports']
+                ]
+                
+                placeholder_table = Table(placeholder_data, colWidths=[2*inch, 3*inch])
+                placeholder_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                    ('FONTSIZE', (0, 0), (-1, -1), 10),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+                ]))
+                
+                return placeholder_table
+                
+        except Exception as e:
+            # If anything fails, return a simple error table
+            error_data = [
+                ['Chart Generation', 'Status'],
+                ['Error', f'Unable to load chart: {str(e)[:50]}...']
+            ]
+            
+            error_table = Table(error_data, colWidths=[2*inch, 3*inch])
+            error_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.red),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('FONTSIZE', (0, 0), (-1, -1), 10)
+            ]))
+            
+            return error_table

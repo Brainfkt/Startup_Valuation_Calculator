@@ -167,14 +167,15 @@ def calculate_growth_rate(initial_value: float, final_value: float, periods: int
     except (TypeError, ValueError, ZeroDivisionError):
         return 0.0
 
-def save_calculation_history(method: str, inputs: Dict[str, Any], result: Dict[str, Any]) -> None:
+def save_calculation_history(method: str, inputs: Dict[str, Any], result: Dict[str, Any], chart_fig=None) -> None:
     """
-    Save calculation to session state history
+    Save calculation to session state history with optional chart
     
     Args:
         method: Valuation method used
         inputs: Input parameters
         result: Calculation results
+        chart_fig: Plotly figure object to save as image
     """
     try:
         if 'calculation_history' not in st.session_state:
@@ -183,11 +184,6 @@ def save_calculation_history(method: str, inputs: Dict[str, Any], result: Dict[s
         # Extract valuation from result
         valuation = result.get('valuation', 0)
         
-        # Get chart from current results if available
-        chart = None
-        if hasattr(st.session_state, 'current_results') and st.session_state.current_results:
-            chart = st.session_state.current_results.get('chart')
-        
         # Create history entry
         history_entry = {
             'id': len(st.session_state.calculation_history),  # Simple ID for deletion
@@ -195,9 +191,21 @@ def save_calculation_history(method: str, inputs: Dict[str, Any], result: Dict[s
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'valuation': valuation,
             'inputs': inputs,
-            'result': result,
-            'chart': chart
+            'result': result
         }
+        
+        # Add chart image data if provided
+        if chart_fig:
+            try:
+                import plotly.io as pio
+                import base64
+                # Convert chart to base64 encoded PNG
+                img_bytes = pio.to_image(chart_fig, format='png', width=800, height=500, scale=2)
+                img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+                history_entry['chart_image'] = img_base64
+            except Exception as e:
+                print(f"Could not save chart image: {e}")
+                # Continue without chart image
         
         # Add to history (keep last 50 entries)
         st.session_state.calculation_history.append(history_entry)
