@@ -289,24 +289,6 @@ class PDFGenerator:
         story.append(comp_table)
         story.append(Spacer(1, 0.2*inch))
         
-        # Add DCF chart
-        try:
-            chart_data = {
-                'result': result,
-                'inputs': {},
-                'method': 'DCF'
-            }
-            chart_path = self.chart_generator.create_dcf_chart(chart_data)
-            if chart_path:
-                chart_image = self.chart_generator.create_reportlab_image(
-                    chart_path, width=6*inch, height=3.5*inch
-                )
-                story.append(chart_image)
-                story.append(Spacer(1, 0.2*inch))
-        except Exception as e:
-            # Continue without chart if generation fails
-            pass
-        
         # Assumptions
         story.append(Paragraph("Key Assumptions", self.styles['Heading3']))
         story.append(Paragraph(
@@ -423,24 +405,6 @@ class PDFGenerator:
         
         story.append(breakdown_table)
         story.append(Spacer(1, 0.2*inch))
-        
-        # Add Berkus chart
-        try:
-            chart_data = {
-                'result': result,
-                'inputs': {},
-                'method': 'Berkus'
-            }
-            chart_path = self.chart_generator.create_berkus_chart(chart_data)
-            if chart_path:
-                chart_image = self.chart_generator.create_reportlab_image(
-                    chart_path, width=6*inch, height=3.5*inch
-                )
-                story.append(chart_image)
-                story.append(Spacer(1, 0.2*inch))
-        except Exception as e:
-            # Continue without chart if generation fails
-            pass
     
     def _add_risk_analysis(self, story: List, result: Dict):
         """Add risk factor analysis"""
