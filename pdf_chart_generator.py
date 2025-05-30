@@ -5,6 +5,7 @@ Creates matplotlib charts for PDF reports with proper sizing and formatting
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import matplotlib.ticker as ticker
 import numpy as np
 from io import BytesIO
 import tempfile
@@ -81,7 +82,7 @@ class PDFChartGenerator:
             ax1.grid(True, alpha=0.3)
             
             # Format y-axis as currency
-            ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'€{x/1000:.0f}K'))
+            ax1.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, p: f'€{x/1000:.0f}K'))
             
             # Chart 2: Valuation Breakdown
             values = [operating_value, terminal_value]
@@ -280,7 +281,7 @@ class PDFChartGenerator:
             ax1.set_xticklabels(criteria_names, rotation=45, ha='right')
             
             # Format y-axis
-            ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'€{x/1000:.0f}K'))
+            ax1.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, p: f'€{x/1000:.0f}K'))
             
             # Add value labels
             for bar, value in zip(bars, values):
@@ -355,7 +356,7 @@ class PDFChartGenerator:
             ax1.set_xticklabels(methods, rotation=45, ha='right')
             
             # Format y-axis
-            ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'€{x/1000000:.1f}M'))
+            ax1.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, p: f'€{x/1000000:.1f}M'))
             
             # Add value labels
             for bar, value in zip(bars, valuations):
@@ -378,7 +379,7 @@ class PDFChartGenerator:
             ax2.grid(True, alpha=0.3)
             
             # Format y-axis
-            ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'€{x/1000000:.1f}M'))
+            ax2.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, p: f'€{x/1000000:.1f}M'))
             
             plt.tight_layout()
             

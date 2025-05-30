@@ -101,9 +101,9 @@ class PDFGenerator:
             if calculation_history:
                 self._add_comprehensive_summary(story, calculation_history)
             
-            # Detailed analysis for each calculation with charts
-            if calculation_history:
-                self._add_detailed_analysis_with_charts(story, calculation_history)
+            # Detailed analysis for current calculation only
+            if current_results:
+                self._add_detailed_analysis(story, current_results)
             
             # Comparative analysis
             if len(calculation_history) > 1:
