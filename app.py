@@ -16,6 +16,7 @@ from pdf_generator import PDFGenerator
 from data_models import SECTOR_MULTIPLES, ValidationResult
 from utils import format_currency, validate_positive_number, save_calculation_history
 from export_manager_simple import ExportManager
+from test_suite import run_test_suite
 
 # Page configuration
 st.set_page_config(
@@ -50,6 +51,12 @@ def main():
             "Venture Capital Method"
         ]
     )
+    
+    # Add test suite section
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🧪 Testing")
+    if st.sidebar.button("Run Test Suite"):
+        st.session_state.show_tests = True
     
 
     
