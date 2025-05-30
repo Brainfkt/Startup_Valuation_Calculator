@@ -860,9 +860,6 @@ def display_calculation_history():
                             st.rerun()
         
         with col2:
-            if st.button("📄 Export to PDF"):
-                generate_pdf_report()
-            
             if st.button("🗑️ Clear All History"):
                 st.session_state.calculation_history = []
                 st.session_state.current_results = {}
