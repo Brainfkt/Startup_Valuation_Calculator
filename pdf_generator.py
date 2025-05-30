@@ -4,17 +4,19 @@ Creates comprehensive PDF reports for valuation calculations
 """
 
 from reportlab.lib.pagesizes import letter, A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from reportlab.graphics.shapes import Drawing, Circle, Rect, String, Line, Polygon
+from reportlab.graphics.charts.piecharts import Pie
+from reportlab.graphics.charts.barcharts import VerticalBarChart
+from reportlab.graphics.charts.legends import Legend
 from datetime import datetime
 from io import BytesIO
 from typing import Dict, List, Any
 import json
-import tempfile
-import os
 
 class PDFGenerator:
     """Generate comprehensive PDF reports for startup valuations"""
@@ -694,24 +696,30 @@ class PDFGenerator:
             ))
 
     def _add_chart_data_table(self, story: List, calc: Dict):
-        """Add chart data as tables with visual elements"""
-        story.append(Paragraph("Visual Data Analysis", self.styles['Heading4']))
+        """Add visual charts and data tables"""
+        story.append(Paragraph("Visual Analysis", self.styles['Heading4']))
         
         method = calc['method']
         result = calc['result']
         
+        # Add ReportLab charts
         if method == "DCF":
+            self._add_dcf_visual_chart(story, calc)
             self._add_dcf_chart_data(story, calc)
-            self._add_dcf_visual_breakdown(story, calc)
         elif method == "Market Multiples":
+            self._add_multiples_visual_chart(story, calc)
             self._add_multiples_chart_data(story, calc)
         elif method == "Scorecard":
+            self._add_scorecard_visual_chart(story, calc)
             self._add_scorecard_chart_data(story, calc)
         elif method == "Berkus":
+            self._add_berkus_visual_chart(story, calc)
             self._add_berkus_chart_data(story, calc)
         elif method == "Risk Factor Summation":
+            self._add_risk_visual_chart(story, calc)
             self._add_risk_chart_data(story, calc)
         elif method == "Venture Capital":
+            self._add_vc_visual_chart(story, calc)
             self._add_vc_chart_data(story, calc)
         
         story.append(Spacer(1, 0.2*inch))
@@ -929,3 +937,223 @@ class PDFGenerator:
             ]))
             
             story.append(comp_table)
+
+    def _add_dcf_visual_chart(self, story: List, calc: Dict):
+        """Add DCF pie chart for value breakdown"""
+        result = calc['result']
+        
+        operating_value = result.get('operating_value', 0)
+        terminal_value = result.get('terminal_pv', 0)
+        
+        if operating_value > 0 or terminal_value > 0:
+            # Create drawing
+            d = Drawing(400, 200)
+            
+            # Create pie chart
+            pie = Pie()
+            pie.x = 50
+            pie.y = 50
+            pie.width = 150
+            pie.height = 150
+            pie.data = [operating_value, terminal_value]
+            pie.labels = ['Operating Value', 'Terminal Value']
+            pie.slices.strokeColor = colors.white
+            pie.slices.strokeWidth = 2
+            pie.slices[0].fillColor = colors.lightblue
+            pie.slices[1].fillColor = colors.darkblue
+            
+            # Add legend
+            legend = Legend()
+            legend.x = 220
+            legend.y = 100
+            legend.colorNamePairs = [
+                (colors.lightblue, 'Operating Value'),
+                (colors.darkblue, 'Terminal Value')
+            ]
+            
+            d.add(pie)
+            d.add(legend)
+            
+            story.append(d)
+            story.append(Spacer(1, 0.1*inch))
+
+    def _add_multiples_visual_chart(self, story: List, calc: Dict):
+        """Add market multiples bar chart"""
+        inputs = calc['inputs']
+        
+        # Import here to avoid circular import
+        from data_models import SECTOR_MULTIPLES
+        
+        sector = inputs.get('sector', '')
+        metric_type = inputs.get('metric_type', 'Revenue')
+        
+        # Create drawing
+        d = Drawing(400, 250)
+        
+        # Create bar chart
+        chart = VerticalBarChart()
+        chart.x = 50
+        chart.y = 50
+        chart.width = 300
+        chart.height = 150
+        
+        # Get sector multiples data
+        sectors = list(SECTOR_MULTIPLES.keys())[:8]  # Limit to 8 for readability
+        multiples = [SECTOR_MULTIPLES[s][metric_type] for s in sectors]
+        
+        chart.data = [multiples]
+        chart.categoryAxis.categoryNames = sectors
+        chart.categoryAxis.labels.angle = 45
+        chart.categoryAxis.labels.fontSize = 8
+        chart.valueAxis.valueMin = 0
+        chart.valueAxis.valueMax = max(multiples) * 1.1
+        
+        # Highlight current sector
+        for i, s in enumerate(sectors):
+            if s == sector:
+                chart.bars[0][i].fillColor = colors.red
+            else:
+                chart.bars[0][i].fillColor = colors.lightblue
+        
+        d.add(chart)
+        story.append(d)
+        story.append(Spacer(1, 0.1*inch))
+
+    def _add_scorecard_visual_chart(self, story: List, calc: Dict):
+        """Add scorecard radar-style chart"""
+        result = calc['result']
+        criteria_analysis = result.get('criteria_analysis', {})
+        
+        # Create drawing
+        d = Drawing(400, 200)
+        
+        # Create simple bar chart for scores
+        chart = VerticalBarChart()
+        chart.x = 50
+        chart.y = 50
+        chart.width = 300
+        chart.height = 120
+        
+        criteria_names = list(criteria_analysis.keys())
+        scores = [criteria_analysis[c]['score'] for c in criteria_names]
+        
+        chart.data = [scores]
+        chart.categoryAxis.categoryNames = [c.title() for c in criteria_names]
+        chart.categoryAxis.labels.angle = 45
+        chart.categoryAxis.labels.fontSize = 8
+        chart.valueAxis.valueMin = 0
+        chart.valueAxis.valueMax = 5
+        
+        # Color bars based on score
+        for i, score in enumerate(scores):
+            if score >= 4:
+                chart.bars[0][i].fillColor = colors.green
+            elif score >= 3:
+                chart.bars[0][i].fillColor = colors.yellow
+            else:
+                chart.bars[0][i].fillColor = colors.red
+        
+        d.add(chart)
+        story.append(d)
+        story.append(Spacer(1, 0.1*inch))
+
+    def _add_berkus_visual_chart(self, story: List, calc: Dict):
+        """Add Berkus method bar chart"""
+        result = calc['result']
+        breakdown = result.get('breakdown', {})
+        
+        # Create drawing
+        d = Drawing(400, 250)
+        
+        # Create bar chart
+        chart = VerticalBarChart()
+        chart.x = 30
+        chart.y = 50
+        chart.width = 340
+        chart.height = 150
+        
+        values = [breakdown[c]['value'] for c in breakdown.keys()]
+        names = [breakdown[c]['name'][:20] + '...' if len(breakdown[c]['name']) > 20 
+                else breakdown[c]['name'] for c in breakdown.keys()]
+        
+        chart.data = [values]
+        chart.categoryAxis.categoryNames = names
+        chart.categoryAxis.labels.angle = 45
+        chart.categoryAxis.labels.fontSize = 7
+        chart.valueAxis.valueMin = 0
+        chart.valueAxis.valueMax = 500000
+        
+        # Color bars
+        for i in range(len(values)):
+            chart.bars[0][i].fillColor = colors.lightgreen
+        
+        d.add(chart)
+        story.append(d)
+        story.append(Spacer(1, 0.1*inch))
+
+    def _add_risk_visual_chart(self, story: List, calc: Dict):
+        """Add risk factor chart"""
+        result = calc['result']
+        risk_analysis = result.get('risk_analysis', {})
+        
+        # Create drawing
+        d = Drawing(400, 250)
+        
+        # Create horizontal bar chart for risk factors
+        risk_names = list(risk_analysis.keys())[:8]  # Limit for readability
+        adjustments = [risk_analysis[r]['adjustment'] * 100 for r in risk_names]
+        
+        # Simple visual representation
+        y_pos = 200
+        for i, (name, adj) in enumerate(zip(risk_names, adjustments)):
+            # Draw risk factor name
+            d.add(String(20, y_pos - i*20, risk_analysis[name]['name'][:25], fontSize=8))
+            
+            # Draw adjustment bar
+            bar_width = abs(adj) * 2  # Scale for visibility
+            bar_color = colors.red if adj < 0 else colors.green
+            
+            if adj < 0:
+                d.add(Rect(200 - bar_width, y_pos - i*20 - 5, bar_width, 10, fillColor=bar_color))
+            else:
+                d.add(Rect(200, y_pos - i*20 - 5, bar_width, 10, fillColor=bar_color))
+            
+            # Draw percentage
+            d.add(String(300, y_pos - i*20, f"{adj:+.1f}%", fontSize=8))
+        
+        # Add center line
+        d.add(Line(200, 20, 200, 220, strokeColor=colors.black))
+        
+        story.append(d)
+        story.append(Spacer(1, 0.1*inch))
+
+    def _add_vc_visual_chart(self, story: List, calc: Dict):
+        """Add VC method visualization"""
+        result = calc['result']
+        
+        # Create drawing
+        d = Drawing(400, 200)
+        
+        exit_value = result.get('exit_value', 0)
+        present_value = result.get('present_value', 0)
+        
+        if exit_value > 0 and present_value > 0:
+            # Create simple comparison chart
+            chart = VerticalBarChart()
+            chart.x = 100
+            chart.y = 50
+            chart.width = 200
+            chart.height = 120
+            
+            chart.data = [[present_value, exit_value]]
+            chart.categoryAxis.categoryNames = ['Present Value', 'Exit Value']
+            chart.categoryAxis.labels.fontSize = 10
+            chart.valueAxis.valueMin = 0
+            
+            chart.bars[0][0].fillColor = colors.lightblue
+            chart.bars[0][1].fillColor = colors.darkblue
+            
+            d.add(chart)
+        
+        story.append(d)
+        story.append(Spacer(1, 0.1*inch))
