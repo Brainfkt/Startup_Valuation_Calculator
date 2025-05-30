@@ -694,14 +694,15 @@ class PDFGenerator:
             ))
 
     def _add_chart_data_table(self, story: List, calc: Dict):
-        """Add chart data as tables to replace visual charts"""
-        story.append(Paragraph("Chart Data", self.styles['Heading4']))
+        """Add chart data as tables with visual elements"""
+        story.append(Paragraph("Visual Data Analysis", self.styles['Heading4']))
         
         method = calc['method']
         result = calc['result']
         
         if method == "DCF":
             self._add_dcf_chart_data(story, calc)
+            self._add_dcf_visual_breakdown(story, calc)
         elif method == "Market Multiples":
             self._add_multiples_chart_data(story, calc)
         elif method == "Scorecard":
@@ -732,13 +733,15 @@ class PDFGenerator:
             # Add terminal value row
             dcf_data.append(['Terminal Value', '-', self._format_currency(result.get('terminal_pv', 0))])
             
-            dcf_table = Table(dcf_data, colWidths=[1.5*inch, 2*inch, 2*inch])
+            dcf_table = Table(dcf_data, colWidths=[1.2*inch, 1.8*inch, 1.8*inch])
             dcf_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white)
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
             ]))
             
             story.append(dcf_table)
@@ -759,13 +762,15 @@ class PDFGenerator:
             is_used = "✓" if sector_name == sector else ""
             mult_data.append([sector_name, f"{multiples[metric_type]:.1f}x", is_used])
         
-        mult_table = Table(mult_data, colWidths=[2*inch, 1.5*inch, 0.8*inch])
+        mult_table = Table(mult_data, colWidths=[2.5*inch, 1.2*inch, 0.8*inch])
         mult_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.white)
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
         ]))
         
         story.append(mult_table)
@@ -784,13 +789,15 @@ class PDFGenerator:
                 f"{data['contribution']:.3f}"
             ])
         
-        score_table = Table(score_data, colWidths=[2*inch, 1*inch, 1*inch, 1.5*inch])
+        score_table = Table(score_data, colWidths=[2*inch, 0.8*inch, 0.8*inch, 1*inch])
         score_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.white)
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
         ]))
         
         story.append(score_table)
@@ -809,13 +816,16 @@ class PDFGenerator:
                 "€500K"
             ])
         
-        berkus_table = Table(berkus_data, colWidths=[2.5*inch, 1*inch, 1.2*inch, 1*inch])
+        berkus_table = Table(berkus_data, colWidths=[3*inch, 0.8*inch, 1*inch, 0.8*inch])
         berkus_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.white)
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('WORDWRAP', (0, 0), (-1, -1), True)
         ]))
         
         story.append(berkus_table)
@@ -833,13 +843,16 @@ class PDFGenerator:
                 f"{data['adjustment']:+.1%}"
             ])
         
-        risk_table = Table(risk_data, colWidths=[3*inch, 1*inch, 1.5*inch])
+        risk_table = Table(risk_data, colWidths=[3*inch, 0.8*inch, 1*inch])
         risk_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.white)
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('WORDWRAP', (0, 0), (-1, -1), True)
         ]))
         
         story.append(risk_table)
@@ -858,13 +871,61 @@ class PDFGenerator:
             vc_data.append(['Ownership %', f"{result.get('ownership_percentage', 0):.1%}"])
             vc_data.append(['Investment Needed', self._format_currency(result.get('investment_needed', 0))])
         
-        vc_table = Table(vc_data, colWidths=[2.5*inch, 2.5*inch])
+        vc_table = Table(vc_data, colWidths=[2.2*inch, 2.2*inch])
         vc_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.white)
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
         ]))
         
         story.append(vc_table)
+
+    def _add_dcf_visual_breakdown(self, story: List, calc: Dict):
+        """Add visual breakdown for DCF valuation"""
+        result = calc['result']
+        
+        operating_value = result.get('operating_value', 0)
+        terminal_value = result.get('terminal_pv', 0)
+        total_value = result.get('valuation', 0)
+        
+        if total_value > 0:
+            operating_pct = (operating_value / total_value) * 100
+            terminal_pct = (terminal_value / total_value) * 100
+            
+            # Create a simple visual breakdown
+            story.append(Paragraph("Valuation Composition", self.styles['Heading4']))
+            
+            composition_data = [
+                ['Component', 'Value', 'Percentage', 'Visual'],
+                [
+                    'Operating Value', 
+                    self._format_currency(operating_value), 
+                    f"{operating_pct:.1f}%",
+                    "█" * int(operating_pct / 5) + "░" * int((100 - operating_pct) / 5)
+                ],
+                [
+                    'Terminal Value', 
+                    self._format_currency(terminal_value), 
+                    f"{terminal_pct:.1f}%",
+                    "█" * int(terminal_pct / 5) + "░" * int((100 - terminal_pct) / 5)
+                ]
+            ]
+            
+            comp_table = Table(composition_data, colWidths=[1.5*inch, 1.2*inch, 0.8*inch, 1.5*inch])
+            comp_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.lightblue),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('FONTNAME', (3, 1), (3, -1), 'Courier')  # Monospace for visual bars
+            ]))
+            
+            story.append(comp_table)
