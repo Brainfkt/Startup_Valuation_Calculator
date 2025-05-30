@@ -110,12 +110,12 @@ class PDFGenerator:
             if len(calculation_history) > 1:
                 self._add_comparative_analysis(story, calculation_history)
             
-            # Visual Charts Section - All charts from the application
-            if calculation_history:
-                self._add_visual_charts_section(story, calculation_history)
-            
             # Appendices
             self._add_appendices(story)
+            
+            # Charts Appendix - All charts from the application
+            if calculation_history:
+                self._add_charts_appendix(story, calculation_history)
             
             # Build PDF
             doc.build(story)
@@ -551,27 +551,37 @@ class PDFGenerator:
         
         story.append(history_table)
     
-    def _add_visual_charts_section(self, story: List, calculation_history: List[Dict]):
-        """Add dedicated visual charts section with all charts from the application"""
+    def _add_charts_appendix(self, story: List, calculation_history: List[Dict]):
+        """Add charts appendix with each valuation method on its own page"""
         story.append(PageBreak())
-        story.append(Paragraph("Visual Charts", self.styles['SectionHeader']))
+        story.append(Paragraph("Appendix A: Visual Charts", self.styles['SectionHeader']))
         story.append(Paragraph(
-            "This section contains all the visual charts generated for each valuation method performed in the application.",
+            "This appendix contains the visual charts for each valuation method, "
+            "presented in the order they were calculated.",
             self.styles['Normal']
         ))
         story.append(Spacer(1, 0.3*inch))
         
-        for calc in calculation_history:
+        for i, calc in enumerate(calculation_history):
+            # Page break before each method (except the first one)
+            if i > 0:
+                story.append(PageBreak())
+            
             method = calc.get('method', 'Unknown')
             result = calc.get('result', {})
             timestamp = calc.get('timestamp', 'Unknown')
+            valuation = result.get('valuation', 0)
             
-            # Add method header
-            story.append(Paragraph(f"{method} Analysis Chart", self.styles['Heading3']))
-            story.append(Paragraph(f"Generated: {timestamp}", self.styles['Normal']))
-            story.append(Spacer(1, 0.1*inch))
+            # Method header with key information
+            story.append(Paragraph(f"{method} Method", self.styles['Heading2']))
+            story.append(Spacer(1, 0.2*inch))
             
-            # Generate and add chart based on method
+            # Summary information
+            story.append(Paragraph(f"Date: {timestamp}", self.styles['Normal']))
+            story.append(Paragraph(f"Valuation: {self._format_currency(valuation)}", self.styles['Normal']))
+            story.append(Spacer(1, 0.3*inch))
+            
+            # Generate and add chart
             try:
                 chart_data = {
                     'result': result,
@@ -589,30 +599,92 @@ class PDFGenerator:
                 elif method == "Berkus":
                     chart_path = self.chart_generator.create_berkus_chart(chart_data)
                 elif method == "Risk Factor Summation":
-                    # Create a simple risk factor chart
                     chart_path = self._create_risk_factor_visual_chart(result)
                 elif method == "Venture Capital":
-                    # Create a simple VC method chart
                     chart_path = self._create_vc_method_visual_chart(result)
                 
                 if chart_path:
+                    # Add chart with larger size for single-page display
                     chart_image = self.chart_generator.create_reportlab_image(
-                        chart_path, width=7*inch, height=4*inch
+                        chart_path, width=6.5*inch, height=4.5*inch
                     )
                     story.append(chart_image)
+                    story.append(Spacer(1, 0.3*inch))
+                    
+                    # Add key insights or interpretation
+                    self._add_chart_interpretation(story, method, result)
                 else:
                     story.append(Paragraph(
-                        f"Chart generation not available for {method} method.",
+                        f"Chart visualization not available for {method} method.",
                         self.styles['Normal']
                     ))
                     
             except Exception as e:
                 story.append(Paragraph(
-                    f"Error generating chart for {method}: {str(e)[:100]}...",
+                    f"Error generating chart for {method} method.",
                     self.styles['Normal']
                 ))
+    
+    def _add_chart_interpretation(self, story: List, method: str, result: Dict):
+        """Add interpretation and key insights for each chart"""
+        story.append(Paragraph("Key Insights:", self.styles['Heading3']))
+        
+        if method == "DCF":
+            operating_value = result.get('operating_value', 0)
+            terminal_pv = result.get('terminal_pv', 0)
+            total_value = operating_value + terminal_pv
             
-            story.append(Spacer(1, 0.3*inch))
+            if total_value > 0:
+                op_percentage = (operating_value / total_value * 100)
+                term_percentage = (terminal_pv / total_value * 100)
+                
+                story.append(Paragraph(
+                    f"• Operating cash flows contribute {op_percentage:.1f}% of total valuation",
+                    self.styles['Normal']
+                ))
+                story.append(Paragraph(
+                    f"• Terminal value represents {term_percentage:.1f}% of total valuation",
+                    self.styles['Normal']
+                ))
+                
+        elif method == "Market Multiples":
+            multiple = result.get('multiple', 0)
+            metric_type = result.get('metric_type', 'Revenue')
+            story.append(Paragraph(
+                f"• Applied {multiple:.1f}x {metric_type.lower()} multiple based on industry comparables",
+                self.styles['Normal']
+            ))
+            
+        elif method == "Scorecard":
+            adjustment_factor = result.get('adjustment_factor', 0)
+            story.append(Paragraph(
+                f"• Overall adjustment factor: {adjustment_factor:.2f}x relative to base valuation",
+                self.styles['Normal']
+            ))
+            
+        elif method == "Berkus":
+            max_possible = result.get('max_possible', 0)
+            achievement_rate = (result.get('valuation', 0) / max_possible * 100) if max_possible > 0 else 0
+            story.append(Paragraph(
+                f"• Achievement rate: {achievement_rate:.1f}% of maximum possible valuation",
+                self.styles['Normal']
+            ))
+            
+        elif method == "Risk Factor Summation":
+            total_adjustment = result.get('total_adjustment', 0)
+            story.append(Paragraph(
+                f"• Net risk adjustment: {total_adjustment:+.1%} applied to base valuation",
+                self.styles['Normal']
+            ))
+            
+        elif method == "Venture Capital":
+            return_multiple = result.get('return_multiple', 0)
+            story.append(Paragraph(
+                f"• Required return multiple: {return_multiple:.1f}x over investment period",
+                self.styles['Normal']
+            ))
+        
+        story.append(Spacer(1, 0.2*inch))
     
     def _create_risk_factor_visual_chart(self, result: Dict) -> Optional[str]:
         """Create a simple risk factor visualization"""
