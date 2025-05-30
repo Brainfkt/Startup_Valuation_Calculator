@@ -939,221 +939,266 @@ class PDFGenerator:
             story.append(comp_table)
 
     def _add_dcf_visual_chart(self, story: List, calc: Dict):
-        """Add DCF pie chart for value breakdown"""
+        """Add DCF visual breakdown"""
         result = calc['result']
         
         operating_value = result.get('operating_value', 0)
         terminal_value = result.get('terminal_pv', 0)
+        total_value = result.get('valuation', 0)
         
-        if operating_value > 0 or terminal_value > 0:
-            # Create drawing
-            d = Drawing(400, 200)
+        if total_value > 0:
+            operating_pct = (operating_value / total_value) * 100
+            terminal_pct = (terminal_value / total_value) * 100
             
-            # Create pie chart
-            pie = Pie()
-            pie.x = 50
-            pie.y = 50
-            pie.width = 150
-            pie.height = 150
-            pie.data = [operating_value, terminal_value]
-            pie.labels = ['Operating Value', 'Terminal Value']
-            pie.slices.strokeColor = colors.white
-            pie.slices.strokeWidth = 2
-            pie.slices[0].fillColor = colors.lightblue
-            pie.slices[1].fillColor = colors.darkblue
+            # Create simple visual breakdown
+            story.append(Paragraph("Value Breakdown", self.styles['Heading4']))
             
-            # Add legend
-            legend = Legend()
-            legend.x = 220
-            legend.y = 100
-            legend.colorNamePairs = [
-                (colors.lightblue, 'Operating Value'),
-                (colors.darkblue, 'Terminal Value')
+            composition_data = [
+                ['Component', 'Value', 'Percentage', 'Visual Bar'],
+                [
+                    'Operating Value', 
+                    self._format_currency(operating_value), 
+                    f"{operating_pct:.1f}%",
+                    "█" * int(operating_pct / 5) + "░" * (20 - int(operating_pct / 5))
+                ],
+                [
+                    'Terminal Value', 
+                    self._format_currency(terminal_value), 
+                    f"{terminal_pct:.1f}%",
+                    "█" * int(terminal_pct / 5) + "░" * (20 - int(terminal_pct / 5))
+                ]
             ]
             
-            d.add(pie)
-            d.add(legend)
+            comp_table = Table(composition_data, colWidths=[1.5*inch, 1.2*inch, 0.8*inch, 2*inch])
+            comp_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.navy),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.lightblue),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('FONTNAME', (3, 1), (3, -1), 'Courier')
+            ]))
             
-            story.append(d)
+            story.append(comp_table)
             story.append(Spacer(1, 0.1*inch))
 
     def _add_multiples_visual_chart(self, story: List, calc: Dict):
-        """Add market multiples bar chart"""
+        """Add market multiples visual comparison"""
         inputs = calc['inputs']
-        
-        # Import here to avoid circular import
-        from data_models import SECTOR_MULTIPLES
+        result = calc['result']
         
         sector = inputs.get('sector', '')
         metric_type = inputs.get('metric_type', 'Revenue')
+        used_multiple = inputs.get('multiple', 0)
         
-        # Create drawing
-        d = Drawing(400, 250)
+        story.append(Paragraph("Sector Multiple Comparison", self.styles['Heading4']))
         
-        # Create bar chart
-        chart = VerticalBarChart()
-        chart.x = 50
-        chart.y = 50
-        chart.width = 300
-        chart.height = 150
+        # Create visual comparison table
+        comparison_data = [
+            ['Metric', 'Your Input', 'Industry Range', 'Visual Comparison'],
+            [
+                f"{metric_type} Multiple",
+                f"{used_multiple:.1f}x",
+                "2.0x - 8.0x (typical)",
+                "█" * min(int(used_multiple), 10) + "░" * (10 - min(int(used_multiple), 10))
+            ]
+        ]
         
-        # Get sector multiples data
-        sectors = list(SECTOR_MULTIPLES.keys())[:8]  # Limit to 8 for readability
-        multiples = [SECTOR_MULTIPLES[s][metric_type] for s in sectors]
+        comp_table = Table(comparison_data, colWidths=[1.5*inch, 1*inch, 1.5*inch, 2*inch])
+        comp_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.darkgreen),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.lightgreen),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTNAME', (3, 1), (3, -1), 'Courier')
+        ]))
         
-        chart.data = [multiples]
-        chart.categoryAxis.categoryNames = sectors
-        chart.categoryAxis.labels.angle = 45
-        chart.categoryAxis.labels.fontSize = 8
-        chart.valueAxis.valueMin = 0
-        chart.valueAxis.valueMax = max(multiples) * 1.1
-        
-        # Highlight current sector
-        for i, s in enumerate(sectors):
-            if s == sector:
-                chart.bars[0][i].fillColor = colors.red
-            else:
-                chart.bars[0][i].fillColor = colors.lightblue
-        
-        d.add(chart)
-        story.append(d)
+        story.append(comp_table)
         story.append(Spacer(1, 0.1*inch))
 
     def _add_scorecard_visual_chart(self, story: List, calc: Dict):
-        """Add scorecard radar-style chart"""
+        """Add scorecard performance visualization"""
         result = calc['result']
         criteria_analysis = result.get('criteria_analysis', {})
         
-        # Create drawing
-        d = Drawing(400, 200)
+        story.append(Paragraph("Scorecard Performance", self.styles['Heading4']))
         
-        # Create simple bar chart for scores
-        chart = VerticalBarChart()
-        chart.x = 50
-        chart.y = 50
-        chart.width = 300
-        chart.height = 120
+        # Create performance visualization table
+        perf_data = [['Criteria', 'Score', 'Performance', 'Visual Rating']]
         
-        criteria_names = list(criteria_analysis.keys())
-        scores = [criteria_analysis[c]['score'] for c in criteria_names]
+        for criteria, analysis in criteria_analysis.items():
+            score = analysis.get('score', 0)
+            rating_visual = "★" * score + "☆" * (5 - score)
+            
+            performance = "Excellent" if score >= 4 else "Good" if score >= 3 else "Average" if score >= 2 else "Poor"
+            
+            perf_data.append([
+                analysis.get('name', criteria.title()),
+                f"{score}/5",
+                performance,
+                rating_visual
+            ])
         
-        chart.data = [scores]
-        chart.categoryAxis.categoryNames = [c.title() for c in criteria_names]
-        chart.categoryAxis.labels.angle = 45
-        chart.categoryAxis.labels.fontSize = 8
-        chart.valueAxis.valueMin = 0
-        chart.valueAxis.valueMax = 5
+        perf_table = Table(perf_data, colWidths=[2*inch, 0.7*inch, 1*inch, 1.3*inch])
+        perf_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.purple),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.lavender),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+        ]))
         
-        # Color bars based on score
-        for i, score in enumerate(scores):
-            if score >= 4:
-                chart.bars[0][i].fillColor = colors.green
-            elif score >= 3:
-                chart.bars[0][i].fillColor = colors.yellow
-            else:
-                chart.bars[0][i].fillColor = colors.red
-        
-        d.add(chart)
-        story.append(d)
+        story.append(perf_table)
         story.append(Spacer(1, 0.1*inch))
 
     def _add_berkus_visual_chart(self, story: List, calc: Dict):
-        """Add Berkus method bar chart"""
+        """Add Berkus method value breakdown"""
         result = calc['result']
         breakdown = result.get('breakdown', {})
         
-        # Create drawing
-        d = Drawing(400, 250)
+        story.append(Paragraph("Berkus Value Breakdown", self.styles['Heading4']))
         
-        # Create bar chart
-        chart = VerticalBarChart()
-        chart.x = 30
-        chart.y = 50
-        chart.width = 340
-        chart.height = 150
+        # Create value breakdown table
+        berkus_data = [['Criteria', 'Score', 'Max Value', 'Assigned Value', 'Visual Progress']]
         
-        values = [breakdown[c]['value'] for c in breakdown.keys()]
-        names = [breakdown[c]['name'][:20] + '...' if len(breakdown[c]['name']) > 20 
-                else breakdown[c]['name'] for c in breakdown.keys()]
+        for criteria, details in breakdown.items():
+            score = details.get('score', 0)
+            value = details.get('value', 0)
+            max_value = 500000  # Berkus max per criterion
+            
+            progress_bars = int((value / max_value) * 10) if max_value > 0 else 0
+            visual_progress = "█" * progress_bars + "░" * (10 - progress_bars)
+            
+            berkus_data.append([
+                details.get('name', criteria.title()),
+                f"{score}/5",
+                f"${max_value:,}",
+                f"${value:,.0f}",
+                visual_progress
+            ])
         
-        chart.data = [values]
-        chart.categoryAxis.categoryNames = names
-        chart.categoryAxis.labels.angle = 45
-        chart.categoryAxis.labels.fontSize = 7
-        chart.valueAxis.valueMin = 0
-        chart.valueAxis.valueMax = 500000
+        berkus_table = Table(berkus_data, colWidths=[1.8*inch, 0.6*inch, 0.8*inch, 1*inch, 1.3*inch])
+        berkus_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.darkorange),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.lightyellow),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTNAME', (4, 1), (4, -1), 'Courier')
+        ]))
         
-        # Color bars
-        for i in range(len(values)):
-            chart.bars[0][i].fillColor = colors.lightgreen
-        
-        d.add(chart)
-        story.append(d)
+        story.append(berkus_table)
         story.append(Spacer(1, 0.1*inch))
 
     def _add_risk_visual_chart(self, story: List, calc: Dict):
-        """Add risk factor chart"""
+        """Add risk factor visualization"""
         result = calc['result']
         risk_analysis = result.get('risk_analysis', {})
         
-        # Create drawing
-        d = Drawing(400, 250)
+        story.append(Paragraph("Risk Factor Analysis", self.styles['Heading4']))
         
-        # Create horizontal bar chart for risk factors
-        risk_names = list(risk_analysis.keys())[:8]  # Limit for readability
-        adjustments = [risk_analysis[r]['adjustment'] * 100 for r in risk_names]
+        # Create risk visualization table
+        risk_data = [['Risk Factor', 'Rating', 'Impact', 'Adjustment', 'Visual Impact']]
         
-        # Simple visual representation
-        y_pos = 200
-        for i, (name, adj) in enumerate(zip(risk_names, adjustments)):
-            # Draw risk factor name
-            d.add(String(20, y_pos - i*20, risk_analysis[name]['name'][:25], fontSize=8))
+        for risk_name, analysis in risk_analysis.items():
+            rating = analysis.get('rating', 0)
+            adjustment = analysis.get('adjustment', 0) * 100
             
-            # Draw adjustment bar
-            bar_width = abs(adj) * 2  # Scale for visibility
-            bar_color = colors.red if adj < 0 else colors.green
-            
-            if adj < 0:
-                d.add(Rect(200 - bar_width, y_pos - i*20 - 5, bar_width, 10, fillColor=bar_color))
+            # Create visual representation
+            if adjustment < 0:
+                visual = "▼" * min(abs(int(adjustment/5)), 5) + " " + "░" * (5 - min(abs(int(adjustment/5)), 5))
+                impact = "Negative"
+            elif adjustment > 0:
+                visual = "▲" * min(int(adjustment/5), 5) + " " + "░" * (5 - min(int(adjustment/5), 5))
+                impact = "Positive"
             else:
-                d.add(Rect(200, y_pos - i*20 - 5, bar_width, 10, fillColor=bar_color))
+                visual = "◆ " + "░" * 4
+                impact = "Neutral"
             
-            # Draw percentage
-            d.add(String(300, y_pos - i*20, f"{adj:+.1f}%", fontSize=8))
+            risk_data.append([
+                analysis.get('name', risk_name.title()),
+                f"{rating}/5" if 'rating' in analysis else f"{rating:+d}",
+                impact,
+                f"{adjustment:+.1f}%",
+                visual
+            ])
         
-        # Add center line
-        d.add(Line(200, 20, 200, 220, strokeColor=colors.black))
+        risk_table = Table(risk_data, colWidths=[2*inch, 0.7*inch, 0.8*inch, 0.8*inch, 1.2*inch])
+        risk_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.darkred),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.lightcoral),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTNAME', (4, 1), (4, -1), 'Courier')
+        ]))
         
-        story.append(d)
+        story.append(risk_table)
         story.append(Spacer(1, 0.1*inch))
 
     def _add_vc_visual_chart(self, story: List, calc: Dict):
         """Add VC method visualization"""
         result = calc['result']
+        inputs = calc['inputs']
         
-        # Create drawing
-        d = Drawing(400, 200)
+        story.append(Paragraph("Venture Capital Analysis", self.styles['Heading4']))
         
         exit_value = result.get('exit_value', 0)
         present_value = result.get('present_value', 0)
+        required_return = inputs.get('required_return', 0) * 100
+        years_to_exit = inputs.get('years_to_exit', 5)
         
-        if exit_value > 0 and present_value > 0:
-            # Create simple comparison chart
-            chart = VerticalBarChart()
-            chart.x = 100
-            chart.y = 50
-            chart.width = 200
-            chart.height = 120
-            
-            chart.data = [[present_value, exit_value]]
-            chart.categoryAxis.categoryNames = ['Present Value', 'Exit Value']
-            chart.categoryAxis.labels.fontSize = 10
-            chart.valueAxis.valueMin = 0
-            
-            chart.bars[0][0].fillColor = colors.lightblue
-            chart.bars[0][1].fillColor = colors.darkblue
-            
-            d.add(chart)
+        # Create VC analysis table
+        vc_data = [
+            ['Metric', 'Value', 'Visual Scale', 'Timeline'],
+            [
+                'Exit Value',
+                self._format_currency(exit_value),
+                "█" * min(10, int(exit_value / 1000000)) + "░" * (10 - min(10, int(exit_value / 1000000))),
+                f"Year {years_to_exit}"
+            ],
+            [
+                'Present Value',
+                self._format_currency(present_value),
+                "█" * min(10, int(present_value / 1000000)) + "░" * (10 - min(10, int(present_value / 1000000))),
+                "Today"
+            ],
+            [
+                'Required Return',
+                f"{required_return:.1f}% annually",
+                "█" * min(10, int(required_return / 5)) + "░" * (10 - min(10, int(required_return / 5))),
+                f"{years_to_exit} years"
+            ]
+        ]
         
-        story.append(d)
+        vc_table = Table(vc_data, colWidths=[1.5*inch, 1.3*inch, 1.5*inch, 1.2*inch])
+        vc_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.lightsteelblue),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTNAME', (2, 1), (2, -1), 'Courier')
+        ]))
+        
+        story.append(vc_table)
         story.append(Spacer(1, 0.1*inch))
