@@ -15,6 +15,7 @@ from chart_generator import ChartGenerator
 from pdf_generator import PDFGenerator
 from data_models import SECTOR_MULTIPLES, ValidationResult
 from utils import format_currency, validate_positive_number, save_calculation_history
+from export_manager import ExportManager
 
 # Page configuration
 st.set_page_config(
@@ -49,6 +50,18 @@ def main():
             "Venture Capital Method"
         ]
     )
+    
+    # Sidebar sections
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📤 Export & Reports")
+    
+    # Export options
+    if st.sidebar.button("Export Data"):
+        st.session_state.show_export = True
+    
+    # PDF report
+    if st.sidebar.button("Generate PDF"):
+        st.session_state.show_pdf = True
     
     # Method-specific interfaces
     if method == "DCF (Discounted Cash Flow)":
@@ -876,6 +889,159 @@ def generate_pdf_report():
         
     except Exception as e:
         st.error(f"PDF generation failed: {str(e)}")
+
+def display_export_options():
+    """Display export options for multiple formats"""
+    if not st.session_state.calculation_history:
+        st.info("No calculations available for export. Please perform calculations first.")
+        return
+    
+    st.subheader("📤 Export Data")
+    
+    export_manager = ExportManager()
+    
+    # Export format selection
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        export_format = st.selectbox(
+            "Select Export Format",
+            options=['csv', 'excel', 'json', 'xml', 'txt'],
+            format_func=lambda x: {
+                'csv': 'CSV (Comma Separated Values)',
+                'excel': 'Excel Spreadsheet (.xlsx)',
+                'json': 'JSON (JavaScript Object Notation)',
+                'xml': 'XML (Extensible Markup Language)',
+                'txt': 'Plain Text Report'
+            }[x]
+        )
+    
+    with col2:
+        include_charts = st.checkbox("Include Chart Data", value=False)
+    
+    # Export options
+    st.write("**Export Options:**")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("📊 Export All Calculations"):
+            try:
+                export_buffer = export_manager.export_calculation_data(
+                    st.session_state.calculation_history,
+                    export_format,
+                    include_charts
+                )
+                
+                file_extensions = {
+                    'csv': 'csv',
+                    'excel': 'xlsx',
+                    'json': 'json',
+                    'xml': 'xml',
+                    'txt': 'txt'
+                }
+                
+                mime_types = {
+                    'csv': 'text/csv',
+                    'excel': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'json': 'application/json',
+                    'xml': 'application/xml',
+                    'txt': 'text/plain'
+                }
+                
+                st.download_button(
+                    label=f"💾 Download {export_format.upper()} File",
+                    data=export_buffer.getvalue(),
+                    file_name=f"valuation_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{file_extensions[export_format]}",
+                    mime=mime_types[export_format]
+                )
+                
+                st.success(f"✅ {export_format.upper()} export prepared with {len(st.session_state.calculation_history)} calculations")
+                
+            except Exception as e:
+                st.error(f"Export failed: {str(e)}")
+    
+    with col2:
+        if st.button("📈 Export Current Results"):
+            if st.session_state.current_results:
+                try:
+                    export_buffer = export_manager.export_single_calculation(
+                        st.session_state.current_results,
+                        export_format,
+                        include_charts
+                    )
+                    
+                    file_extensions = {
+                        'csv': 'csv',
+                        'excel': 'xlsx', 
+                        'json': 'json',
+                        'xml': 'xml',
+                        'txt': 'txt'
+                    }
+                    
+                    mime_types = {
+                        'csv': 'text/csv',
+                        'excel': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        'json': 'application/json',
+                        'xml': 'application/xml',
+                        'txt': 'text/plain'
+                    }
+                    
+                    st.download_button(
+                        label=f"💾 Download Current {export_format.upper()}",
+                        data=export_buffer.getvalue(),
+                        file_name=f"current_valuation_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{file_extensions[export_format]}",
+                        mime=mime_types[export_format]
+                    )
+                    
+                    st.success(f"✅ Current calculation exported as {export_format.upper()}")
+                    
+                except Exception as e:
+                    st.error(f"Export failed: {str(e)}")
+            else:
+                st.warning("No current calculation to export. Please perform a calculation first.")
+    
+    with col3:
+        if st.button("🔍 Export Comparison Report"):
+            if len(st.session_state.calculation_history) >= 2:
+                try:
+                    export_buffer = export_manager.export_comparison_report(
+                        st.session_state.calculation_history,
+                        'excel'  # Comparison reports work best in Excel
+                    )
+                    
+                    st.download_button(
+                        label="💾 Download Comparison Report",
+                        data=export_buffer.getvalue(),
+                        file_name=f"valuation_comparison_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                    
+                    st.success("✅ Comparison report prepared with statistical analysis")
+                    
+                except Exception as e:
+                    st.error(f"Comparison export failed: {str(e)}")
+            else:
+                st.warning("Need at least 2 calculations for comparison report.")
+    
+    # Export metadata
+    with st.expander("📋 Export Information"):
+        metadata = export_manager.get_export_metadata(st.session_state.calculation_history)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.metric("Total Calculations", metadata['total_calculations'])
+            st.metric("Successful Calculations", metadata['successful_calculations'])
+            
+        with col2:
+            st.metric("Failed Calculations", metadata['failed_calculations'])
+            st.write("**Methods Used:**", ", ".join(metadata['methods_used']))
+        
+        if metadata['date_range']['earliest']:
+            st.write("**Date Range:**")
+            st.write(f"From: {metadata['date_range']['earliest']}")
+            st.write(f"To: {metadata['date_range']['latest']}")
 
 if __name__ == "__main__":
     main()
