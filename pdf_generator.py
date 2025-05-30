@@ -102,9 +102,9 @@ class PDFGenerator:
             if calculation_history:
                 self._add_comprehensive_summary(story, calculation_history)
             
-            # Detailed analysis for all calculations with charts
+            # Detailed analysis for all calculations (tables only)
             if calculation_history:
-                self._add_detailed_analysis_with_charts(story, calculation_history)
+                self._add_detailed_analysis_tables_only(story, calculation_history)
             
             # Comparative analysis
             if len(calculation_history) > 1:
@@ -839,8 +839,8 @@ class PDFGenerator:
         story.append(summary_table)
         story.append(Spacer(1, 0.3*inch))
 
-    def _add_detailed_analysis_with_charts(self, story: List, calculation_history: List[Dict]):
-        """Add detailed analysis for each calculation with chart data tables"""
+    def _add_detailed_analysis_tables_only(self, story: List, calculation_history: List[Dict]):
+        """Add detailed analysis for each calculation with tables only (no charts)"""
         story.append(PageBreak())
         story.append(Paragraph("Detailed Analysis", self.styles['SectionHeader']))
         
@@ -850,10 +850,7 @@ class PDFGenerator:
             story.append(Paragraph(f"Valuation: {self._format_currency(calc['valuation'])}", self.styles['MetricValue']))
             story.append(Spacer(1, 0.2*inch))
             
-            # Add chart data table if available
-            self._add_chart_data_table(story, calc)
-            
-            # Method-specific details
+            # Method-specific details (tables only, no charts)
             if calc['method'] == "DCF":
                 self._add_dcf_analysis(story, calc['result'])
             elif calc['method'] == "Market Multiples":
